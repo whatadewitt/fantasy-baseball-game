@@ -3,6 +3,7 @@ import { Fraunces, Outfit } from 'next/font/google'
 import './globals.css'
 import Link from 'next/link'
 import NavLinks from '@/components/NavLinks'
+import { GoogleAnalytics } from '@next/third-parties/google'
 
 const fraunces = Fraunces({
   subsets: ['latin'],
@@ -45,6 +46,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <div id="main-content">
           {children}
         </div>
+        <GoogleAnalytics gaId="G-QJ3QZ352NV" />
       </body>
     </html>
   )
