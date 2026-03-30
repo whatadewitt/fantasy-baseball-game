@@ -22,14 +22,20 @@ export async function POST(req: NextRequest) {
     from += 1000
   }
 
-  const uniquePlayers = new Map<number, { mlb_id: number; position: string }>()
+  // Build unique (mlb_id, group) pairs — a two-way player needs both hitting + pitching
+  const playerEntries: { mlb_id: number; group: 'hitting' | 'pitching' }[] = []
+  const seen = new Set<string>()
   for (const p of allPlayers) {
-    if (p.mlb_id && !uniquePlayers.has(p.mlb_id)) {
-      uniquePlayers.set(p.mlb_id, p)
+    if (!p.mlb_id) continue
+    const group = isHitter(p.position) ? 'hitting' : 'pitching'
+    const key = `${p.mlb_id}-${group}`
+    if (!seen.has(key)) {
+      seen.add(key)
+      playerEntries.push({ mlb_id: p.mlb_id, group })
     }
   }
 
-  if (uniquePlayers.size === 0) {
+  if (playerEntries.length === 0) {
     return NextResponse.json({ message: 'No players found', updated: 0 })
   }
 
@@ -37,15 +43,13 @@ export async function POST(req: NextRequest) {
   let gamesStored = 0
   const errors: string[] = []
 
-  // Process in batches of 5
-  const entries = Array.from(uniquePlayers.values())
-  for (let i = 0; i < entries.length; i += 5) {
-    const batch = entries.slice(i, i + 5)
+  // Process in batches of 20
+  for (let i = 0; i < playerEntries.length; i += 20) {
+    const batch = playerEntries.slice(i, i + 20)
     const results = await Promise.allSettled(
-      batch.map(async (player) => {
-        const group = isHitter(player.position) ? 'hitting' : 'pitching'
+      batch.map(async (entry) => {
         const res = await fetch(
-          `${mlbBase}/people/${player.mlb_id}/stats?stats=gameLog&season=2026&group=${group}`
+          `${mlbBase}/people/${entry.mlb_id}/stats?stats=gameLog&season=2026&group=${entry.group}`
         )
         if (!res.ok) return { updated: false, games: 0 }
 
@@ -58,8 +62,9 @@ export async function POST(req: NextRequest) {
           const s = split.stat
           const ip = parseFloat(String(s.inningsPitched || '0'))
           return {
-            mlb_id: player.mlb_id,
+            mlb_id: entry.mlb_id,
             date: split.date,
+            stat_group: entry.group,
             games_played: 1,
             hits: s.hits || 0,
             home_runs: s.homeRuns || 0,
@@ -78,7 +83,7 @@ export async function POST(req: NextRequest) {
 
         const { error } = await supabase
           .from('player_stats')
-          .upsert(rows, { onConflict: 'mlb_id,date' })
+          .upsert(rows, { onConflict: 'mlb_id,date,stat_group' })
 
         if (error) throw new Error(error.message)
         return { updated: true, games: rows.length }
@@ -101,19 +106,13 @@ export async function POST(req: NextRequest) {
     .select('id, user_id, player_id, players(mlb_id, position)')
     .eq('swapped_out', false)
 
-  // Get all 2026 stats (not just today)
+  // Get all 2026 stats (not just today), with stat_group for correct matching
   const { data: allStats } = await supabase
     .from('player_stats')
-    .select('mlb_id, date, hits, home_runs, runs, rbis, stolen_bases, strikeouts, wins, saves, innings_pitched')
+    .select('mlb_id, date, stat_group, hits, home_runs, runs, rbis, stolen_bases, strikeouts, wins, saves, innings_pitched')
     .neq('date', '2025-12-31')
 
-  // Group stats by mlb_id and date
-  const statsByMlbIdDate: Record<string, typeof allStats extends (infer T)[] | null ? T : never> = {}
-  for (const s of allStats || []) {
-    statsByMlbIdDate[`${s.mlb_id}-${s.date}`] = s
-  }
-
-  // Build score rows
+  // Build score rows — match roster position to correct stat_group
   const scoreRows: {
     user_id: string; player_id: string; date: string;
     hitter_points: number; pitcher_points: number; total_points: number;
@@ -125,9 +124,11 @@ export async function POST(req: NextRequest) {
     if (!player?.mlb_id) continue
 
     const hitter = isHitter(player.position)
+    const expectedGroup = hitter ? 'hitting' : 'pitching'
 
     for (const s of allStats || []) {
       if (s.mlb_id !== player.mlb_id) continue
+      if (s.stat_group !== expectedGroup) continue
 
       const hitter_points = hitter ? calculateHitterPoints(s) : 0
       const pitcher_points = hitter ? 0 : calculatePitcherPoints(s)

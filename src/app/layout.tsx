@@ -17,8 +17,8 @@ const outfit = Outfit({
 })
 
 export const metadata: Metadata = {
-  title: 'Fantasy Baseball 2026',
-  description: 'Kids Fantasy Baseball Game',
+  title: 'Rookie Fantasy Ball',
+  description: 'Rookie Fantasy Ball — Kids Fantasy Baseball League',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -37,7 +37,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <header className="bg-navy text-white">
           <nav aria-label="Main navigation" className="max-w-5xl mx-auto px-4 py-4 flex flex-wrap items-center justify-between gap-2">
             <Link href="/" className="font-display text-xl font-semibold tracking-tight py-1 rounded-lg focus-ring-invert">
-              Fantasy Baseball <span className="text-gold">&rsquo;26</span>
+              Rookie Fantasy Ball <span className="text-gold">&rsquo;26</span>
             </Link>
             <NavLinks />
           </nav>

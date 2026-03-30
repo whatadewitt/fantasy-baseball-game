@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import PlayerCard from './PlayerCard'
 
@@ -22,10 +23,10 @@ interface Player {
   mlb_id: number
   name: string
   position: string
+  position_box: number
   team: string
   image_url: string | null
   headshot_url: string | null
-  claimed: boolean
   stats: PlayerStats | null
   is_hitter: boolean
 }
@@ -48,13 +49,20 @@ const POSITION_LABELS: Record<string, string> = {
 }
 
 export default function SelectionBoard() {
+  const router = useRouter()
   const [positions, setPositions] = useState<PositionGroup[]>([])
-  const [myRoster, setMyRoster] = useState<Set<string>>(new Set())
-  const [pickedBoxes, setPickedBoxes] = useState<Set<string>>(new Set())
+  // Picks already saved to DB from a previous session
+  const [savedPicks, setSavedPicks] = useState<Map<string, string>>(new Map()) // boxKey -> playerId
+  // Local pending selections (not yet submitted)
+  const [pendingPicks, setPendingPicks] = useState<Map<string, string>>(new Map()) // boxKey -> playerId
+  const [userId, setUserId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
-  const [picking, setPicking] = useState<string | null>(null)
+  const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [toast, setToast] = useState<string | null>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const positionRefs = useRef<Map<string, HTMLDivElement>>(new Map())
 
   const loadPlayers = useCallback(async () => {
     try {
@@ -82,17 +90,17 @@ export default function SelectionBoard() {
       if (meRes.ok) {
         const meData = await meRes.json()
         if (meData.user) {
+          setUserId(meData.user.id)
           const rosterRes = await fetch(`/api/roster/${meData.user.id}`)
           if (rosterRes.ok) {
             const rosterData = await rosterRes.json()
-            const myPlayerIds = new Set<string>((rosterData.roster || []).map((r: { player_id: string }) => r.player_id))
-            setMyRoster(myPlayerIds)
-
-            const picked = new Set<string>()
+            const saved = new Map<string, string>()
             for (const r of rosterData.roster || []) {
-              picked.add(`${r.players?.position}-${r.players?.position_box}`)
+              if (r.players?.position && r.players?.position_box != null) {
+                saved.set(`${r.players.position}-${r.players.position_box}`, r.player_id)
+              }
             }
-            setPickedBoxes(picked)
+            setSavedPicks(saved)
           }
         }
       }
@@ -121,38 +129,91 @@ export default function SelectionBoard() {
     }
   }, [loadPlayers])
 
-  const pickPlayer = useCallback(async (playerId: string) => {
-    setPicking(playerId)
-    setError(null)
+  const togglePlayer = useCallback((player: Player) => {
+    const boxKey = `${player.position}-${player.position_box}`
+    // Can't change a saved pick
+    if (savedPicks.has(boxKey)) return
 
-    const res = await fetch('/api/roster/pick', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ player_id: playerId }),
+    setPendingPicks(prev => {
+      const next = new Map(prev)
+      if (next.get(boxKey) === player.id) {
+        next.delete(boxKey) // deselect
+      } else {
+        next.set(boxKey, player.id) // select (replaces any previous pick in this box)
+      }
+      return next
     })
+  }, [savedPicks])
 
-    const data = await res.json()
-    setPicking(null)
+  const showToast = useCallback((message: string) => {
+    if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current)
+    setToast(message)
+    toastTimeoutRef.current = setTimeout(() => setToast(null), 4000)
+  }, [])
 
-    if (!res.ok) {
-      setError(data.error || 'Failed to pick player')
+  const handleSubmit = useCallback(async () => {
+    // Check all groups have a pick (saved or pending)
+    const allPicks = new Map([...savedPicks, ...pendingPicks])
+    const missing: { position: string; boxNumber: number }[] = []
+    for (const posGroup of positions) {
+      for (const box of posGroup.boxes) {
+        if (!allPicks.has(`${posGroup.position}-${box.box_number}`)) {
+          missing.push({ position: posGroup.position, boxNumber: box.box_number })
+        }
+      }
+    }
+
+    if (missing.length > 0) {
+      const el = positionRefs.current.get(missing[0].position)
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
       return
     }
 
-    await loadPlayers()
-  }, [loadPlayers])
-
-  const pickCallbacksRef = useRef<Map<string, () => void>>(new Map())
-  const getPickCallback = useCallback((playerId: string) => {
-    let cb = pickCallbacksRef.current.get(playerId)
-    if (!cb) {
-      cb = () => pickPlayer(playerId)
-      pickCallbacksRef.current.set(playerId, cb)
+    if (pendingPicks.size === 0) {
+      // All picks were already saved
+      if (userId) router.push(`/team/${userId}`)
+      return
     }
-    return cb
-  }, [pickPlayer])
+
+    setSubmitting(true)
+    setError(null)
+
+    const res = await fetch('/api/roster/pick-batch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ player_ids: [...pendingPicks.values()] }),
+    })
+
+    const data = await res.json()
+    setSubmitting(false)
+
+    if (!res.ok) {
+      setError(data.error || 'Failed to submit picks')
+      return
+    }
+
+    showToast('Roster saved!')
+    if (userId) router.push(`/team/${userId}`)
+  }, [savedPicks, pendingPicks, positions, userId, router, showToast])
 
   if (loading) return <div className="py-12 text-ink-muted text-sm" role="status">Loading players...</div>
+
+  // Merge saved + pending to determine state per box
+  const allPicks = new Map([...savedPicks, ...pendingPicks])
+
+  // Build list of missing groups (every group needs a pick)
+  const missingGroups: { position: string; boxNumber: number }[] = []
+  for (const posGroup of positions) {
+    for (const box of posGroup.boxes) {
+      const boxKey = `${posGroup.position}-${box.box_number}`
+      if (!allPicks.has(boxKey)) {
+        missingGroups.push({ position: posGroup.position, boxNumber: box.box_number })
+      }
+    }
+  }
+
+  // A position is fully picked when all its groups have a pick
+  const positionsWithMissing = new Set(missingGroups.map(g => g.position))
 
   return (
     <div>
@@ -169,37 +230,56 @@ export default function SelectionBoard() {
         </div>
       )}
 
+      {toast && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-3 bg-navy text-white text-sm rounded-lg shadow-lg animate-fade-in max-w-md text-center" role="status">
+          {toast}
+        </div>
+      )}
+
       {POSITION_ORDER.map(pos => {
         const posGroup = positions.find(p => p.position === pos)
         if (!posGroup) return null
+        const hasPickedPosition = !positionsWithMissing.has(pos)
 
         return (
-          <div key={pos} className="mb-10 sm:mb-12">
+          <div key={pos} className="mb-10 sm:mb-12" ref={el => { if (el) positionRefs.current.set(pos, el) }}>
             <div className="sticky top-0 z-10 bg-bg py-3 -mx-4 px-4 border-b border-navy/8">
               <div className="flex items-baseline gap-3">
                 <span className="font-display text-lg sm:text-xl font-semibold text-crimson">{pos}</span>
                 <span className="text-xs sm:text-sm text-ink-muted">{POSITION_LABELS[pos]}</span>
+                {hasPickedPosition && <span className="text-success text-xs font-semibold">&#10003;</span>}
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 mt-4">
               {posGroup.boxes.sort((a, b) => a.box_number - b.box_number).map(box => {
                 const boxKey = `${pos}-${box.box_number}`
-                const hasPickedFromBox = pickedBoxes.has(boxKey)
+                const savedPickId = savedPicks.get(boxKey)
+                const pendingPickId = pendingPicks.get(boxKey)
+                const hasPickFromBox = savedPickId != null || pendingPickId != null
 
                 return (
-                  <div key={box.box_number} className={`${hasPickedFromBox ? 'opacity-60' : ''}`}>
+                  <div key={box.box_number}>
                     <p className="text-[10px] uppercase tracking-widest text-ink-muted font-medium mb-2">Group {box.box_number}</p>
                     <div className="space-y-1.5">
-                      {box.players.map(player => (
-                        <PlayerCard
-                          key={player.id}
-                          player={player}
-                          isMyPick={myRoster.has(player.id)}
-                          canPick={!hasPickedFromBox && !player.claimed}
-                          picking={picking === player.id}
-                          onPick={getPickCallback(player.id)}
-                        />
-                      ))}
+                      {box.players.map(player => {
+                        const isSaved = savedPickId === player.id
+                        const isPending = pendingPickId === player.id
+                        const isMyPick = isSaved || isPending
+                        const canPick = !savedPickId // can't change saved picks
+
+                        return (
+                          <div key={player.id} className={hasPickFromBox && !isMyPick ? 'opacity-60' : ''}>
+                            <PlayerCard
+                              player={player}
+                              isMyPick={isMyPick}
+                              isPending={isPending}
+                              canPick={canPick}
+                              picking={false}
+                              onPick={() => togglePlayer(player)}
+                            />
+                          </div>
+                        )
+                      })}
                     </div>
                   </div>
                 )
@@ -208,6 +288,46 @@ export default function SelectionBoard() {
           </div>
         )
       })}
+
+      {userId && (
+        <div className="mt-8 mb-4">
+          {missingGroups.length > 0 && (
+            <div className="mb-4 text-sm text-ink-secondary space-y-1">
+              <p className="font-medium text-ink">Still need a pick for:</p>
+              <ul className="list-none space-y-0.5">
+                {missingGroups.map(({ position, boxNumber }) => (
+                  <li key={`${position}-${boxNumber}`}>
+                    <button
+                      type="button"
+                      className="text-crimson hover:underline focus-ring rounded"
+                      onClick={() => {
+                        const el = positionRefs.current.get(position)
+                        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                      }}
+                    >
+                      {POSITION_LABELS[position]} ({position}) — Group {boxNumber}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          <div className="text-center">
+            <button
+              type="button"
+              onClick={handleSubmit}
+              disabled={submitting}
+              className={`px-8 py-3 rounded-lg font-semibold text-sm transition-all focus-ring ${
+                missingGroups.length === 0
+                  ? 'bg-navy text-white hover:bg-navy-light cursor-pointer'
+                  : 'bg-navy/40 text-white/70 cursor-not-allowed'
+              }`}
+            >
+              {submitting ? 'Saving...' : 'Submit Roster'}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

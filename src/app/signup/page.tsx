@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 
 export default function SignupPage() {
   const [email, setEmail] = useState('')
@@ -116,11 +117,15 @@ export default function SignupPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-navy text-white font-medium py-3 rounded-lg hover:bg-navy-light disabled:opacity-50 transition-colors focus-ring"
+            className="w-full bg-navy text-white font-medium py-3 rounded-lg hover:bg-navy-light disabled:opacity-50 transition-colors focus-ring cursor-pointer"
           >
             {loading ? 'Creating account...' : 'Create account'}
           </button>
         </form>
+
+        <p className="mt-6 text-center text-sm text-ink-muted reveal" style={{ '--delay': 2 } as React.CSSProperties}>
+          Already have an account? <Link href="/login" className="text-crimson hover:underline focus-ring rounded">Log in</Link>
+        </p>
       </div>
     </main>
   )

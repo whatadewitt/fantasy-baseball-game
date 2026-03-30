@@ -21,7 +21,6 @@ interface Player {
   team: string
   image_url: string | null
   headshot_url: string | null
-  claimed: boolean
   stats: PlayerStats | null
   is_hitter: boolean
 }
@@ -29,6 +28,7 @@ interface Player {
 interface Props {
   player: Player
   isMyPick: boolean
+  isPending?: boolean
   canPick: boolean
   picking: boolean
   onPick: () => void
@@ -44,13 +44,13 @@ function formatStatLine(player: Player): string | null {
   return `${s.games_played} GP, ${s.strikeouts} K, ${s.wins} W, ${s.saves} SV`
 }
 
-export default memo(function PlayerCard({ player, isMyPick, canPick, picking, onPick }: Props) {
-  const isInteractive = canPick && !picking
+export default memo(function PlayerCard({ player, isMyPick, isPending, canPick, picking, onPick }: Props) {
+  const isInteractive = (canPick || isPending) && !picking
 
   const styles = isMyPick
-    ? 'bg-success-pale border-success/30'
-    : player.claimed
-    ? 'bg-surface-alt border-transparent opacity-60'
+    ? isPending
+      ? 'bg-crimson/8 border-crimson/30'
+      : 'bg-success-pale border-success/30'
     : 'bg-surface border-navy/8'
 
   const interactiveStyles = isInteractive
@@ -58,11 +58,7 @@ export default memo(function PlayerCard({ player, isMyPick, canPick, picking, on
     : ''
 
   const statusLabel = isMyPick
-    ? 'Selected by you'
-    : player.claimed
-    ? 'Taken by another team'
-    : picking
-    ? 'Picking…'
+    ? isPending ? 'Selected (unsaved)' : 'On your roster'
     : 'Available — click to pick'
 
   const statLine = formatStatLine(player)
@@ -92,18 +88,17 @@ export default memo(function PlayerCard({ player, isMyPick, canPick, picking, on
         </div>
       )}
       <div className="flex-1 min-w-0">
-        <p className={`font-medium text-sm truncate ${player.claimed && !isMyPick ? 'text-ink-muted line-through' : 'text-ink'}`}>
+        <p className="font-medium text-sm truncate text-ink">
           {player.name}
         </p>
         <p className="text-xs text-ink-muted truncate">
           {player.team}
-          {statLine && <span className="text-ink-muted/70"> · {statLine}</span>}
+          {statLine ? <span className="text-ink-muted/70"> · {statLine}</span> : <span className="text-ink-muted/50"> · No 2025 MLB data</span>}
         </p>
       </div>
       <div className="shrink-0 text-xs" aria-hidden="true">
-        {isMyPick && <span className="text-success font-semibold">Yours</span>}
-        {!isMyPick && player.claimed && <span className="text-ink-muted">Taken</span>}
-        {!isMyPick && !player.claimed && picking && <span className="text-crimson">...</span>}
+        {isMyPick && !isPending && <span className="text-success font-semibold">Saved</span>}
+        {isPending && <span className="text-crimson font-semibold">Selected</span>}
       </div>
     </button>
   )

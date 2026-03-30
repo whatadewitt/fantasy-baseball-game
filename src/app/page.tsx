@@ -9,7 +9,7 @@ export default function StandingsPage() {
           <h1 className="font-display text-3xl sm:text-5xl font-semibold text-navy tracking-tight">
             Season Standings
           </h1>
-          <p className="text-ink-secondary mt-2 text-sm sm:text-base">Fantasy Baseball 2026</p>
+          <p className="text-ink-secondary mt-2 text-sm sm:text-base">Rookie Fantasy Ball 2026</p>
         </div>
         <div className="reveal" style={{ '--delay': 1 } as React.CSSProperties}>
           <Suspense fallback={<div className="py-12 text-ink-muted text-sm">Loading standings...</div>}>

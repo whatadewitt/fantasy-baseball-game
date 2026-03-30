@@ -26,18 +26,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Player not found' }, { status: 404 })
   }
 
-  // Check player not already claimed
-  const { data: existingClaim } = await supabase
-    .from('rosters')
-    .select('id')
-    .eq('player_id', player_id)
-    .eq('swapped_out', false)
-    .single()
-
-  if (existingClaim) {
-    return NextResponse.json({ error: 'Player already claimed' }, { status: 409 })
-  }
-
   // Check user doesn't already have a player from this position+box
   const { data: userRoster } = await supabase
     .from('rosters')

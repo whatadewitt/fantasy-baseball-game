@@ -5,8 +5,14 @@ import AdminPlayerManager from '@/components/AdminPlayerManager'
 
 export default function AdminPage() {
   const [apiKey, setApiKey] = useState('')
+  const [authorized, setAuthorized] = useState<boolean | null>(null)
 
   useEffect(() => {
+    fetch('/api/auth/me')
+      .then(res => res.ok ? res.json() : null)
+      .then(data => setAuthorized(data?.user?.id === process.env.NEXT_PUBLIC_ADMIN_USER_ID))
+      .catch(() => setAuthorized(false))
+
     const saved = localStorage.getItem('admin_api_key')
     if (saved) setApiKey(saved)
   }, [])
@@ -61,6 +67,13 @@ export default function AdminPage() {
       : `❌ ${data.error}`
     )
   }
+
+  if (authorized === null) return <div className="min-h-screen bg-gray-900" />
+  if (!authorized) return (
+    <main className="min-h-screen bg-gray-900 text-white flex items-center justify-center">
+      <p className="text-gray-400">Not authorized</p>
+    </main>
+  )
 
   return (
     <main className="min-h-screen bg-gray-900 text-white">

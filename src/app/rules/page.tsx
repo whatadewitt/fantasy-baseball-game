@@ -1,7 +1,7 @@
 import Link from 'next/link'
 
 export const metadata = {
-  title: 'Rules — Fantasy Baseball 2026',
+  title: 'Rules — Rookie Fantasy Ball',
 }
 
 export default function RulesPage() {
@@ -21,7 +21,7 @@ export default function RulesPage() {
             <h2 className="font-display text-xl font-semibold text-navy mb-4">How It Works</h2>
             <div className="space-y-3 text-ink-secondary text-sm sm:text-base leading-relaxed">
               <p>Each team picks <strong className="text-ink">one player per position group</strong>. There are 9 positions &mdash; C, 1B, 2B, 3B, SS, OF, DH, SP, and RP &mdash; and each position has multiple groups to choose from.</p>
-              <p>Once you pick a player from a group, that group is locked for you. Other managers can still pick from the same group, but each individual player can only be claimed by one team.</p>
+              <p>Other managers will also build their rosters, and all teams will compete against one another through the MLB season.</p>
               <p>Points accumulate throughout the 2026 MLB season based on real stats.</p>
             </div>
           </section>

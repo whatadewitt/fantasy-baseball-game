@@ -26,11 +26,16 @@ export async function POST(req: NextRequest) {
     from += 1000
   }
 
-  // Deduplicate by mlb_id (same player can appear at multiple positions)
-  const uniquePlayers = new Map<number, { mlb_id: number; position: string }>()
+  // Build unique (mlb_id, group) pairs — a two-way player needs both hitting + pitching
+  const playerEntries: { mlb_id: number; group: 'hitting' | 'pitching' }[] = []
+  const seen = new Set<string>()
   for (const p of allPlayers) {
-    if (p.mlb_id && !uniquePlayers.has(p.mlb_id)) {
-      uniquePlayers.set(p.mlb_id, p)
+    if (!p.mlb_id) continue
+    const group = isHitter(p.position) ? 'hitting' : 'pitching'
+    const key = `${p.mlb_id}-${group}`
+    if (!seen.has(key)) {
+      seen.add(key)
+      playerEntries.push({ mlb_id: p.mlb_id, group })
     }
   }
 
@@ -39,15 +44,13 @@ export async function POST(req: NextRequest) {
   let skippedCount = 0
   const errors: string[] = []
 
-  // Process in batches of 5 to avoid hammering the API
-  const entries = Array.from(uniquePlayers.values())
-  for (let i = 0; i < entries.length; i += 5) {
-    const batch = entries.slice(i, i + 5)
+  // Process in batches of 20
+  for (let i = 0; i < playerEntries.length; i += 20) {
+    const batch = playerEntries.slice(i, i + 20)
     const results = await Promise.allSettled(
-      batch.map(async (player) => {
-        const group = isHitter(player.position) ? 'hitting' : 'pitching'
+      batch.map(async (entry) => {
         const res = await fetch(
-          `${mlbBase}/people/${player.mlb_id}/stats?stats=season&season=2025&group=${group}`
+          `${mlbBase}/people/${entry.mlb_id}/stats?stats=season&season=2025&group=${entry.group}`
         )
         if (!res.ok) return null
 
@@ -56,8 +59,9 @@ export async function POST(req: NextRequest) {
         if (!stat) return null
 
         const row = {
-          mlb_id: player.mlb_id,
+          mlb_id: entry.mlb_id,
           date: DATE_KEY,
+          stat_group: entry.group,
           games_played: stat.gamesPlayed || stat.gamesPitched || 0,
           hits: stat.hits || 0,
           home_runs: stat.homeRuns || 0,
@@ -75,7 +79,7 @@ export async function POST(req: NextRequest) {
 
         const { error } = await supabase
           .from('player_stats')
-          .upsert(row, { onConflict: 'mlb_id,date' })
+          .upsert(row, { onConflict: 'mlb_id,date,stat_group' })
 
         if (error) throw new Error(error.message)
         return true
@@ -93,7 +97,7 @@ export async function POST(req: NextRequest) {
     success: true,
     players_updated: updatedCount,
     players_skipped: skippedCount,
-    players_total: uniquePlayers.size,
+    players_total: playerEntries.length,
     errors: errors.length ? errors.slice(0, 20) : undefined,
   })
 }

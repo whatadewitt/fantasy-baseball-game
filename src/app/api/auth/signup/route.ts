@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase'
 import { generateToken } from '@/lib/auth'
 import { containsProfanity } from '@/lib/profanity'
+import { Resend } from 'resend'
 
 export async function POST(req: NextRequest) {
   const { email, name, team_name } = await req.json()
@@ -44,13 +45,38 @@ export async function POST(req: NextRequest) {
     expires_at: expiresAt,
   })
 
-  // In production, email the token. For now, return it directly.
   const verifyUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/auth/verify?token=${token}`
+
+  // Send email
+  if (process.env.RESEND_API_KEY) {
+    const resend = new Resend(process.env.RESEND_API_KEY)
+    const { error: emailError } = await resend.emails.send({
+      from: 'Rookie Fantasy Ball <noreply@whatadewitt.com>',
+      to: normalizedEmail,
+      subject: `Welcome to Rookie Fantasy Ball, ${name}!`,
+      html: `
+        <div style="font-family: -apple-system, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
+          <h1 style="font-size: 24px; color: #1a2744; margin-bottom: 8px;">Welcome to the league!</h1>
+          <p style="color: #555; font-size: 15px; line-height: 1.5;">
+            Your team <strong>${team_name}</strong> has been created. Click the link below to log in and pick your players.
+          </p>
+          <a href="${verifyUrl}" style="display: inline-block; background: #1a2744; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 15px; margin: 20px 0;">
+            Pick Your Team →
+          </a>
+          <p style="color: #999; font-size: 13px; margin-top: 24px;">This link expires in 24 hours.</p>
+        </div>
+      `,
+    })
+
+    if (emailError) {
+      console.error('Failed to send signup email:', emailError)
+    }
+  }
 
   return NextResponse.json({
     success: true,
     message: 'Check your email for a login link',
-    // Remove this in production:
-    debug_verify_url: verifyUrl
+    // Show debug URL only when Resend is not configured
+    ...(!process.env.RESEND_API_KEY && { debug_verify_url: verifyUrl }),
   })
 }

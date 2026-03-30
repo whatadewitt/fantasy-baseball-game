@@ -26,22 +26,25 @@ async function getTeam(userId: string) {
       .from('player_stats')
       .select('*')
       .in('mlb_id', mlbIds.length ? mlbIds : [0])
+      .neq('date', '2025-12-31')
 
-    const statsByMlbId: Record<number, {
+    // Aggregate stats per mlb_id + stat_group (handles two-way players like Ohtani)
+    const statsByKey: Record<string, {
       hits: number, home_runs: number, runs: number, rbis: number, stolen_bases: number,
       strikeouts: number, wins: number, saves: number,
       innings_pitched: number, earned_runs: number, updated_at: string
     }> = {}
 
     for (const stat of allStats || []) {
-      if (!statsByMlbId[stat.mlb_id]) {
-        statsByMlbId[stat.mlb_id] = {
+      const key = `${stat.mlb_id}-${stat.stat_group || 'hitting'}`
+      if (!statsByKey[key]) {
+        statsByKey[key] = {
           hits: 0, home_runs: 0, runs: 0, rbis: 0, stolen_bases: 0,
           strikeouts: 0, wins: 0, saves: 0,
           innings_pitched: 0, earned_runs: 0, updated_at: stat.updated_at
         }
       }
-      const s = statsByMlbId[stat.mlb_id]
+      const s = statsByKey[key]
       s.hits += stat.hits || 0
       s.home_runs += stat.home_runs || 0
       s.runs += stat.runs || 0
@@ -57,7 +60,8 @@ async function getTeam(userId: string) {
 
     let totalPoints = 0
     const rosterWithPoints = (roster || []).map((r: { players: { mlb_id: number; position: string } } & Record<string, unknown>) => {
-      const stats = statsByMlbId[r.players?.mlb_id] || null
+      const group = isHitter(r.players?.position) ? 'hitting' : 'pitching'
+      const stats = statsByKey[`${r.players?.mlb_id}-${group}`] || null
       let points = 0
       if (stats) {
         if (isHitter(r.players?.position)) {
@@ -158,7 +162,7 @@ export default async function TeamView({ userId }: { userId: string }) {
               <tbody>
                 {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                 {hitters.map((r: any) => (
-                  <tr key={r.roster_id} className="border-b border-navy/5 last:border-b-0">
+                  <tr key={r.id} className="border-b border-navy/5 last:border-b-0">
                     <td className="px-2 sm:px-4 py-2.5">
                       <p className="font-medium text-ink truncate max-w-[120px] sm:max-w-[180px]">{r.players?.name}</p>
                       <p className="text-[10px] sm:text-xs text-ink-muted">{r.position} · {r.players?.team}</p>
@@ -199,7 +203,7 @@ export default async function TeamView({ userId }: { userId: string }) {
                 {pitchers.map((r: any) => {
                   const outs = r.stats ? Math.floor(r.stats.innings_pitched) * 3 + Math.round((r.stats.innings_pitched % 1) * 10) : null
                   return (
-                  <tr key={r.roster_id} className="border-b border-navy/5 last:border-b-0">
+                  <tr key={r.id} className="border-b border-navy/5 last:border-b-0">
                     <td className="px-2 sm:px-4 py-2.5">
                       <p className="font-medium text-ink truncate max-w-[120px] sm:max-w-[180px]">{r.players?.name}</p>
                       <p className="text-[10px] sm:text-xs text-ink-muted">{r.position} · {r.players?.team}</p>

@@ -29,39 +29,18 @@ export async function GET() {
 
   const players = allPlayers
 
-  // Get claimed player IDs and aggregated stats in parallel
+  // Get 2025 stats for all players, keyed by mlb_id + stat_group
   const mlbIds = players.map(p => p.mlb_id).filter(Boolean)
 
-  const [{ data: rosters }, { data: allStats }] = await Promise.all([
-    supabase.from('rosters').select('player_id').eq('swapped_out', false),
-    mlbIds.length > 0
-      ? supabase.from('player_stats').select('mlb_id, games_played, hits, home_runs, runs, rbis, stolen_bases, strikeouts, wins, saves, innings_pitched').in('mlb_id', mlbIds)
-      : Promise.resolve({ data: [] }),
-  ])
+  const { data: allStats } = mlbIds.length > 0
+    ? await supabase.from('player_stats').select('mlb_id, stat_group, games_played, hits, home_runs, runs, rbis, stolen_bases, strikeouts, wins, saves, innings_pitched').in('mlb_id', mlbIds).eq('date', '2025-12-31')
+    : { data: [] }
 
-  const claimedIds = new Set((rosters || []).map((r: { player_id: string }) => r.player_id))
-
-  // Aggregate stats per mlb_id
-  const statsByMlbId: Record<number, {
-    games_played: number, hits: number, home_runs: number, runs: number, rbis: number, stolen_bases: number,
-    strikeouts: number, wins: number, saves: number, innings_pitched: number,
-  }> = {}
-
+  // Index stats by mlb_id + stat_group
+  type StatRow = NonNullable<typeof allStats>[number]
+  const statsByKey: Record<string, StatRow> = {}
   for (const stat of allStats || []) {
-    if (!statsByMlbId[stat.mlb_id]) {
-      statsByMlbId[stat.mlb_id] = { games_played: 0, hits: 0, home_runs: 0, runs: 0, rbis: 0, stolen_bases: 0, strikeouts: 0, wins: 0, saves: 0, innings_pitched: 0 }
-    }
-    const s = statsByMlbId[stat.mlb_id]
-    s.games_played += stat.games_played || 0
-    s.hits += stat.hits || 0
-    s.home_runs += stat.home_runs || 0
-    s.runs += stat.runs || 0
-    s.rbis += stat.rbis || 0
-    s.stolen_bases += stat.stolen_bases || 0
-    s.strikeouts += stat.strikeouts || 0
-    s.wins += stat.wins || 0
-    s.saves += stat.saves || 0
-    s.innings_pitched += stat.innings_pitched || 0
+    statsByKey[`${stat.mlb_id}-${stat.stat_group}`] = stat
   }
 
   // Group by position and box
@@ -82,8 +61,7 @@ export async function GET() {
       box_number: parseInt(boxNum),
       players: boxPlayers.map(p => ({
         ...p,
-        claimed: claimedIds.has(p.id),
-        stats: statsByMlbId[p.mlb_id] || null,
+        stats: statsByKey[`${p.mlb_id}-${isHitter(position) ? 'hitting' : 'pitching'}`] || null,
         headshot_url: p.mlb_id
           ? `https://img.mlbstatic.com/mlb-photos/image/upload/w_213,d_people:generic:headshot:silo:current.png,q_auto:best,f_auto/v1/people/${p.mlb_id}/headshot/silo/current`
           : null,

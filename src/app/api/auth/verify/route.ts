@@ -27,8 +27,18 @@ export async function GET(req: NextRequest) {
     .update({ used_at: new Date().toISOString() })
     .eq('id', authToken.id)
 
-  // Set session cookie and redirect to select page
-  const response = NextResponse.redirect(new URL('/select', req.url))
+  // Check if user has a roster — redirect to team page if so, otherwise selection
+  const { data: roster } = await supabase
+    .from('rosters')
+    .select('id')
+    .eq('user_id', authToken.user_id)
+    .limit(1)
+
+  const destination = roster && roster.length > 0
+    ? `/team/${authToken.user_id}`
+    : '/select'
+
+  const response = NextResponse.redirect(new URL(destination, req.url))
   response.cookies.set('user_id', authToken.user_id, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',

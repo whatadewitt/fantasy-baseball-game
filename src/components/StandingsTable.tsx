@@ -1,5 +1,7 @@
 import Link from 'next/link'
 import { createServiceClient } from '@/lib/supabase'
+import { getCurrentUser } from '@/lib/auth'
+import { isHitter, calculateHitterPoints, calculatePitcherPoints } from '@/lib/scoring'
 
 interface StandingsEntry {
   user_id: string
@@ -14,36 +16,66 @@ async function getStandings(): Promise<StandingsEntry[]> {
   try {
     const supabase = createServiceClient()
 
-    const { data: users, error } = await supabase
-      .from('users')
-      .select('id, team_name, created_at')
-      .order('created_at')
+    const [{ data: users, error }, { data: rosters }, { data: scores }] = await Promise.all([
+      supabase.from('users').select('id, team_name, created_at').order('created_at'),
+      supabase.from('rosters').select('user_id, player_id, players(mlb_id, position)').eq('swapped_out', false),
+      supabase.from('scores').select('user_id, date, total_points'),
+    ])
 
     if (error || !users) return []
 
-    const [{ data: scores }, { data: rosters }] = await Promise.all([
-      supabase.from('scores').select('user_id, date, total_points'),
-      supabase.from('rosters').select('user_id').eq('swapped_out', false),
-    ])
+    // Get all rostered mlb_ids for stat lookup
+    type RosterRow = { user_id: string; player_id: string; players: { mlb_id: number; position: string } }
+    const typedRosters = (rosters || []) as unknown as RosterRow[]
+    const mlbIds = [...new Set(typedRosters.map(r => r.players?.mlb_id).filter(Boolean))]
 
-    // Find yesterday's date (most recent scoring date)
-    const allDates = new Set((scores || []).map(s => s.date))
-    const sortedDates = Array.from(allDates).sort().reverse()
-    const lastDate = sortedDates[0] || null
+    const { data: allStats } = mlbIds.length > 0
+      ? await supabase.from('player_stats').select('mlb_id, stat_group, hits, home_runs, runs, rbis, stolen_bases, strikeouts, wins, saves, innings_pitched').in('mlb_id', mlbIds).neq('date', '2025-12-31')
+      : { data: [] }
 
+    // Aggregate stats per mlb_id + stat_group
+    const statsByKey: Record<string, { hits: number, home_runs: number, runs: number, rbis: number, stolen_bases: number, strikeouts: number, wins: number, saves: number, innings_pitched: number }> = {}
+    for (const stat of allStats || []) {
+      const key = `${stat.mlb_id}-${stat.stat_group || 'hitting'}`
+      if (!statsByKey[key]) {
+        statsByKey[key] = { hits: 0, home_runs: 0, runs: 0, rbis: 0, stolen_bases: 0, strikeouts: 0, wins: 0, saves: 0, innings_pitched: 0 }
+      }
+      const s = statsByKey[key]
+      s.hits += stat.hits || 0
+      s.home_runs += stat.home_runs || 0
+      s.runs += stat.runs || 0
+      s.rbis += stat.rbis || 0
+      s.stolen_bases += stat.stolen_bases || 0
+      s.strikeouts += stat.strikeouts || 0
+      s.wins += stat.wins || 0
+      s.saves += stat.saves || 0
+      s.innings_pitched += stat.innings_pitched || 0
+    }
+
+    // Calculate total points per user from player_stats (same as TeamView)
     const totalByUser: Record<string, number> = {}
-    const lastNightByUser: Record<string, number> = {}
+    const rosterCounts: Record<string, number> = {}
+    for (const r of typedRosters) {
+      rosterCounts[r.user_id] = (rosterCounts[r.user_id] || 0) + 1
+      if (!r.players?.mlb_id) continue
 
+      const hitter = isHitter(r.players.position)
+      const group = hitter ? 'hitting' : 'pitching'
+      const stats = statsByKey[`${r.players.mlb_id}-${group}`]
+      if (!stats) continue
+
+      const points = hitter ? calculateHitterPoints(stats) : calculatePitcherPoints(stats)
+      totalByUser[r.user_id] = (totalByUser[r.user_id] || 0) + points
+    }
+
+    // Use scores table only for "last night" change column
+    const allDates = new Set((scores || []).map(s => s.date))
+    const lastDate = Array.from(allDates).sort().reverse()[0] || null
+    const lastNightByUser: Record<string, number> = {}
     for (const score of scores || []) {
-      totalByUser[score.user_id] = (totalByUser[score.user_id] || 0) + score.total_points
       if (score.date === lastDate) {
         lastNightByUser[score.user_id] = (lastNightByUser[score.user_id] || 0) + score.total_points
       }
-    }
-
-    const rosterCounts: Record<string, number> = {}
-    for (const r of rosters || []) {
-      rosterCounts[r.user_id] = (rosterCounts[r.user_id] || 0) + 1
     }
 
     return users
@@ -62,7 +94,7 @@ async function getStandings(): Promise<StandingsEntry[]> {
 }
 
 export default async function StandingsTable() {
-  const standings = await getStandings()
+  const [standings, currentUser] = await Promise.all([getStandings(), getCurrentUser()])
 
   if (standings.length === 0) {
     return (
@@ -92,17 +124,16 @@ export default async function StandingsTable() {
           </tr>
         </thead>
         <tbody className="text-sm sm:text-base">
-          {standings.map((entry, i) => (
-            <tr key={entry.user_id} className="border-b border-navy/5 last:border-b-0 hover:bg-surface-alt transition-colors">
+          {standings.map((entry, i) => {
+            const isMe = currentUser?.id === entry.user_id
+            return (
+            <tr key={entry.user_id} className={`border-b border-navy/5 last:border-b-0 transition-colors ${isMe ? 'bg-crimson/5 border-l-3 border-l-crimson' : 'hover:bg-surface-alt'}`}>
               <td className="px-3 sm:px-4 py-3 text-ink-muted font-medium">{i + 1}</td>
               <td className="px-3 sm:px-4 py-3">
                 <Link href={`/team/${entry.user_id}`} className="inline-flex items-center gap-2.5 font-medium text-navy hover:text-crimson transition-colors rounded focus-ring">
                   <img src={`/api/avatar/${entry.user_id}?name=${encodeURIComponent(entry.team_name)}`} alt="" width={28} height={28} className="w-7 h-7 shrink-0" />
                   {entry.team_name}
                 </Link>
-                {i === 0 && entry.total_points > 0 && (
-                  <span className="ml-2 text-gold text-xs font-display font-semibold">1st</span>
-                )}
               </td>
               {hasLastNight && (
                 <td className="px-3 sm:px-4 py-3 text-right text-ink-muted">
@@ -114,7 +145,8 @@ export default async function StandingsTable() {
               )}
               <td className="px-3 sm:px-4 py-3 text-right font-display font-semibold text-crimson">{entry.total_points}</td>
             </tr>
-          ))}
+            )
+          })}
         </tbody>
       </table>
     </div>
