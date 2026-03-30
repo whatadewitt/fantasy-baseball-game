@@ -7,7 +7,7 @@ export async function GET() {
   // Get all users with their total scores
   const { data: users, error } = await supabase
     .from('users')
-    .select('id, email, team_name, created_at')
+    .select('id, team_name, created_at')
     .order('created_at')
 
   if (error) {
@@ -39,7 +39,6 @@ export async function GET() {
     .map(u => ({
       user_id: u.id,
       team_name: u.team_name,
-      email: u.email,
       total_points: scoresByUser[u.id] || 0,
       player_count: rosterCounts[u.id] || 0,
       created_at: u.created_at,

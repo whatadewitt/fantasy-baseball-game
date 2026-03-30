@@ -4,7 +4,7 @@ import { isHitter } from '@/lib/scoring'
 
 export async function POST(req: NextRequest) {
   const apiKey = req.headers.get('x-api-key')
-  if (apiKey !== process.env.ADMIN_API_KEY && process.env.ADMIN_API_KEY) {
+  if (!process.env.ADMIN_API_KEY || apiKey !== process.env.ADMIN_API_KEY) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

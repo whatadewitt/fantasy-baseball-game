@@ -25,7 +25,8 @@ export async function POST(req: NextRequest) {
   }
 
   if (!users || users.length === 0) {
-    return NextResponse.json({ error: 'No account found with that email' }, { status: 404 })
+    // Return same response whether email exists or not — prevents enumeration
+    return NextResponse.json({ success: true, message: 'If that email is registered, we sent a login link' })
   }
 
   // Generate a token for each team
@@ -84,7 +85,7 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({
     success: true,
-    message: 'Check your email for a login link',
+    message: 'If that email is registered, we sent a login link',
     // Show debug URLs only when Resend is not configured
     ...(!process.env.RESEND_API_KEY && { debug_teams: teams }),
   })

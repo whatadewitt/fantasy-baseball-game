@@ -8,9 +8,9 @@ export default function AdminPage() {
   const [authorized, setAuthorized] = useState<boolean | null>(null)
 
   useEffect(() => {
-    fetch('/api/auth/me')
+    fetch('/api/auth/is-admin')
       .then(res => res.ok ? res.json() : null)
-      .then(data => setAuthorized(data?.user?.id === process.env.NEXT_PUBLIC_ADMIN_USER_ID))
+      .then(data => setAuthorized(data?.admin === true))
       .catch(() => setAuthorized(false))
 
     const saved = localStorage.getItem('admin_api_key')

@@ -3,7 +3,7 @@ import { createServiceClient } from '@/lib/supabase'
 
 function checkAuth(req: NextRequest) {
   const apiKey = req.headers.get('x-api-key')
-  return !process.env.ADMIN_API_KEY || apiKey === process.env.ADMIN_API_KEY
+  return !!process.env.ADMIN_API_KEY && apiKey === process.env.ADMIN_API_KEY
 }
 
 export async function GET(req: NextRequest) {
