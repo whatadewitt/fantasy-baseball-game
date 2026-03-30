@@ -196,7 +196,36 @@ export default function SelectionBoard() {
     if (userId) router.push(`/team/${userId}`)
   }, [savedPicks, pendingPicks, positions, userId, router, showToast])
 
-  if (loading) return <div className="py-12 text-ink-muted text-sm" role="status">Loading players...</div>
+  if (loading) return (
+    <div className="animate-pulse" role="status">
+      {[...Array(3)].map((_, i) => (
+        <div key={i} className="mb-10 sm:mb-12">
+          <div className="py-3 border-b border-navy/8 flex items-baseline gap-3 mb-4">
+            <div className="h-5 w-8 bg-navy/10 rounded" />
+            <div className="h-3 w-20 bg-navy/10 rounded" />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+            {[...Array(2)].map((_, j) => (
+              <div key={j}>
+                <div className="h-2.5 w-14 bg-navy/10 rounded mb-2" />
+                <div className="space-y-1.5">
+                  {[...Array(4)].map((_, k) => (
+                    <div key={k} className="flex items-center gap-3 p-2.5 rounded-lg bg-surface">
+                      <div className="w-11 h-11 bg-navy/10 rounded-full shrink-0" />
+                      <div className="flex-1">
+                        <div className="h-3.5 w-28 bg-navy/10 rounded mb-1.5" />
+                        <div className="h-2.5 w-16 bg-navy/10 rounded" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
 
   // Merge saved + pending to determine state per box
   const allPicks = new Map([...savedPicks, ...pendingPicks])

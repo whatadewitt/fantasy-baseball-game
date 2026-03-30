@@ -164,8 +164,17 @@ export default async function TeamView({ userId }: { userId: string }) {
                 {hitters.map((r: any) => (
                   <tr key={r.id} className="border-b border-navy/5 last:border-b-0">
                     <td className="px-2 sm:px-4 py-2.5">
-                      <p className="font-medium text-ink truncate max-w-[120px] sm:max-w-[180px]">{r.players?.name}</p>
-                      <p className="text-[10px] sm:text-xs text-ink-muted">{r.position} · {r.players?.team}</p>
+                      <div className="flex items-center gap-2 sm:gap-3">
+                        <img
+                          src={r.players?.mlb_id ? `https://img.mlbstatic.com/mlb-photos/image/upload/w_213,d_people:generic:headshot:silo:current.png,q_auto:best,f_auto/v1/people/${r.players.mlb_id}/headshot/silo/current` : ''}
+                          alt=""
+                          className="w-8 h-8 sm:w-10 sm:h-10 rounded-full object-cover bg-navy/5 shrink-0"
+                        />
+                        <div className="min-w-0">
+                          <p className="font-medium text-ink truncate max-w-[120px] sm:max-w-[180px]">{r.players?.name}</p>
+                          <p className="text-[10px] sm:text-xs text-ink-muted">{r.position} · {r.players?.team}</p>
+                        </div>
+                      </div>
                     </td>
                     <td className="px-1 sm:px-2 py-2.5 text-center text-ink-secondary">{r.stats?.hits ?? '—'}</td>
                     <td className="px-1 sm:px-2 py-2.5 text-center text-ink-secondary">{r.stats?.home_runs ?? '—'}</td>
@@ -205,8 +214,17 @@ export default async function TeamView({ userId }: { userId: string }) {
                   return (
                   <tr key={r.id} className="border-b border-navy/5 last:border-b-0">
                     <td className="px-2 sm:px-4 py-2.5">
-                      <p className="font-medium text-ink truncate max-w-[120px] sm:max-w-[180px]">{r.players?.name}</p>
-                      <p className="text-[10px] sm:text-xs text-ink-muted">{r.position} · {r.players?.team}</p>
+                      <div className="flex items-center gap-2 sm:gap-3">
+                        <img
+                          src={r.players?.mlb_id ? `https://img.mlbstatic.com/mlb-photos/image/upload/w_213,d_people:generic:headshot:silo:current.png,q_auto:best,f_auto/v1/people/${r.players.mlb_id}/headshot/silo/current` : ''}
+                          alt=""
+                          className="w-8 h-8 sm:w-10 sm:h-10 rounded-full object-cover bg-navy/5 shrink-0"
+                        />
+                        <div className="min-w-0">
+                          <p className="font-medium text-ink truncate max-w-[120px] sm:max-w-[180px]">{r.players?.name}</p>
+                          <p className="text-[10px] sm:text-xs text-ink-muted">{r.position} · {r.players?.team}</p>
+                        </div>
+                      </div>
                     </td>
                     <td className="px-1 sm:px-2 py-2.5 text-center text-ink-secondary">{outs ?? '—'}</td>
                     <td className="px-1 sm:px-2 py-2.5 text-center text-ink-secondary">{r.stats?.strikeouts ?? '—'}</td>
