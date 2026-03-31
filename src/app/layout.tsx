@@ -20,6 +20,7 @@ const outfit = Outfit({
 export const metadata: Metadata = {
   title: 'Rookie Fantasy Ball',
   description: 'Rookie Fantasy Ball — Kids Fantasy Baseball League',
+  robots: { index: false, follow: false },
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
