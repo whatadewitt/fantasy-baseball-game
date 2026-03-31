@@ -1,3 +1,6 @@
+// Bump this when avatar rendering changes to bust browser/CDN caches
+export const AVATAR_VERSION = 2
+
 // Deterministic hash from string
 function hash(str: string): number {
   let h = 5381

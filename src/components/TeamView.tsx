@@ -1,4 +1,5 @@
 import { isHitter, calculateHitterPoints, calculatePitcherPoints } from '@/lib/scoring'
+import { AVATAR_VERSION } from '@/lib/cap-colors'
 import { createServiceClient } from '@/lib/supabase'
 import Link from 'next/link'
 
@@ -122,7 +123,7 @@ export default async function TeamView({ userId }: { userId: string }) {
         </Link>
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
           <div className="flex items-center gap-4 min-w-0">
-            <img src={`/api/avatar/${user.id}?name=${encodeURIComponent(user.team_name)}`} alt="" width={56} height={56} className="w-14 h-14 shrink-0" />
+            <img src={`/api/avatar/${user.id}?name=${encodeURIComponent(user.team_name)}&v=${AVATAR_VERSION}`} alt="" width={56} height={56} className="w-14 h-14 shrink-0" />
             <div className="min-w-0">
               <h1 className="font-display text-3xl sm:text-4xl font-semibold text-navy tracking-tight truncate">{user.team_name}</h1>
               {user.name && <p className="text-ink-muted text-sm mt-1">Manager: {user.name}</p>}

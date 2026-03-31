@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase'
-import { getCapColors, getCapFont, getTeamInitial } from '@/lib/cap-colors'
+import { getCapColors, getCapFont, getTeamInitial, AVATAR_VERSION } from '@/lib/cap-colors'
 
 const svgCache = new Map<string, string>()
+let cacheVersion = 0
 
 export async function GET(
   req: NextRequest,
@@ -22,6 +23,10 @@ export async function GET(
       .eq('id', teamId)
       .single()
     teamName = user?.team_name || 'T'
+  }
+  if (cacheVersion !== AVATAR_VERSION) {
+    svgCache.clear()
+    cacheVersion = AVATAR_VERSION
   }
   const cacheKey = `${teamId}:${teamName}`
   const cached = svgCache.get(cacheKey)
