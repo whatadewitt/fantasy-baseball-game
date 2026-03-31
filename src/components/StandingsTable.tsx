@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { createServiceClient } from '@/lib/supabase'
 import { getCurrentUser } from '@/lib/auth'
 import { isHitter, calculateHitterPoints, calculatePitcherPoints } from '@/lib/scoring'
+import { AVATAR_VERSION } from '@/lib/cap-colors'
 
 interface StandingsEntry {
   user_id: string
@@ -131,7 +132,7 @@ export default async function StandingsTable() {
               <td className="px-3 sm:px-4 py-3 text-ink-muted font-medium">{i + 1}</td>
               <td className="px-3 sm:px-4 py-3">
                 <Link href={`/team/${entry.user_id}`} className="inline-flex items-center gap-2.5 font-medium text-navy hover:text-crimson transition-colors rounded focus-ring">
-                  <img src={`/api/avatar/${entry.user_id}?name=${encodeURIComponent(entry.team_name)}`} alt="" width={28} height={28} className="w-7 h-7 shrink-0" />
+                  <img src={`/api/avatar/${entry.user_id}?name=${encodeURIComponent(entry.team_name)}&v=${AVATAR_VERSION}`} alt="" width={28} height={28} className="w-7 h-7 shrink-0" />
                   {entry.team_name}
                 </Link>
               </td>
