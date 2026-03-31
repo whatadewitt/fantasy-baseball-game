@@ -1,6 +1,8 @@
 import { Suspense } from 'react'
 import TeamView from '@/components/TeamView'
 
+export const dynamic = 'force-dynamic'
+
 export default async function TeamPage({ params }: { params: Promise<{ userId: string }> }) {
   const { userId } = await params
   return (

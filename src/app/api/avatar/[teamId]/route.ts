@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase'
 import { getCapColors, getCapFont, getTeamInitial, AVATAR_VERSION } from '@/lib/cap-colors'
 
+export const dynamic = 'force-dynamic'
+
 const svgCache = new Map<string, string>()
 let cacheVersion = 0
 

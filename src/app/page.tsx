@@ -1,6 +1,8 @@
 import { Suspense } from 'react'
 import StandingsTable from '@/components/StandingsTable'
 
+export const dynamic = 'force-dynamic'
+
 export default function StandingsPage() {
   return (
     <main className="min-h-screen">
