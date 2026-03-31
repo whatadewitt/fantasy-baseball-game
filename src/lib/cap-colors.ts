@@ -1,5 +1,5 @@
 // Bump this when avatar rendering changes to bust browser/CDN caches
-export const AVATAR_VERSION = 2
+export const AVATAR_VERSION = 3
 
 // Deterministic hash from string
 function hash(str: string): number {
@@ -10,39 +10,22 @@ function hash(str: string): number {
   return h
 }
 
-// Convert HSL (h: 0-360, s: 0-100, l: 0-100) to hex color string
-function hslToHex(h: number, s: number, l: number): string {
-  const sn = s / 100
-  const ln = l / 100
-  const a = sn * Math.min(ln, 1 - ln)
-  const f = (n: number) => {
-    const k = (n + h / 30) % 12
-    const color = ln - a * Math.max(Math.min(k - 3, 9 - k, 1), -1)
-    return Math.round(255 * color).toString(16).padStart(2, '0')
-  }
-  return `#${f(0)}${f(8)}${f(4)}`
-}
+// Hand-picked palette of visually distinct baseball cap colors
+const CAP_PALETTE = [
+  { cap: '#1a2744', brim: '#0f1a2e', letter: '#c8cdd5' }, // Navy
+  { cap: '#8b1a2b', brim: '#6b1421', letter: '#f0d0a0' }, // Maroon
+  { cap: '#1e6b3a', brim: '#155a2e', letter: '#f0e8c0' }, // Forest
+  { cap: '#c0392b', brim: '#962d22', letter: '#ffffff' }, // Red
+  { cap: '#2d5da1', brim: '#234a80', letter: '#f5e6c8' }, // Royal
+  { cap: '#1a1a1e', brim: '#101014', letter: '#d4a542' }, // Black
+  { cap: '#d35400', brim: '#a84300', letter: '#1a1a1e' }, // Orange
+  { cap: '#5b2c8e', brim: '#472270', letter: '#e8daf0' }, // Purple
+]
 
-// Generate unique cap colors from a hash — no fixed palette, infinite variety
+// Pick a cap color scheme from the curated palette
 export function getCapColors(teamId: string, teamName: string) {
-  const h1 = hash(teamId + teamName)
-  const h2 = hash(teamName + teamId)
-
-  // Pick a hue and keep saturation/lightness in ranges that look like real caps
-  const hue = h1 % 360
-  const capSat = 40 + (h2 % 35)       // 40-75% — rich but not neon
-  const capLight = 20 + (h1 % 20)      // 20-40% — dark enough to read letter on
-
-  const cap = hslToHex(hue, capSat, capLight)
-  const brim = hslToHex(hue, capSat, Math.max(capLight - 8, 8))
-
-  // Letter color: light on dark cap
-  const letterHue = (hue + 30 + (h2 % 40)) % 360  // slight hue shift
-  const letterLight = 80 + (h2 % 15)               // 80-95%
-  const letterSat = 10 + (h2 % 30)                 // 10-40% — mostly neutral/cream
-  const letter = hslToHex(letterHue, letterSat, letterLight)
-
-  return { cap, brim, letter }
+  const h = hash(teamId + teamName)
+  return CAP_PALETTE[h % CAP_PALETTE.length]
 }
 
 export function getTeamInitial(teamName: string): string {
