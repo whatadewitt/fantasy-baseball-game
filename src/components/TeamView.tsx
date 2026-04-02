@@ -177,8 +177,8 @@ export default async function TeamView({ userId }: { userId: string }) {
                   <th className="px-1 sm:px-2 py-2.5 text-center font-medium" scope="col"><abbr title="Runs">R</abbr></th>
                   <th className="px-1 sm:px-2 py-2.5 text-center font-medium" scope="col"><abbr title="Runs Batted In">RBI</abbr></th>
                   <th className="px-1 sm:px-2 py-2.5 text-center font-medium" scope="col"><abbr title="Stolen Bases">SB</abbr></th>
-                  <th className="px-1 sm:px-2 py-2.5 text-center font-medium" scope="col"><abbr title="Last Night Points">Last&nbsp;Night</abbr></th>
-                  <th className="px-1 sm:px-2 py-2.5 text-center font-medium" scope="col"><abbr title="Last 7 Days Points">Last&nbsp;7d</abbr></th>
+                  <th className="px-1 sm:px-2 py-2.5 text-center font-medium" scope="col"><abbr title="Last Night Points">LN</abbr></th>
+                  <th className="px-1 sm:px-2 py-2.5 text-center font-medium" scope="col"><abbr title="Last 7 Days Points">L7</abbr></th>
                   <th className="px-2 sm:px-4 py-2.5 text-right font-medium" scope="col">Pts</th>
                 </tr>
               </thead>
@@ -229,8 +229,8 @@ export default async function TeamView({ userId }: { userId: string }) {
                   <th className="px-1 sm:px-2 py-2.5 text-center font-medium" scope="col"><abbr title="Strikeouts">K</abbr></th>
                   <th className="px-1 sm:px-2 py-2.5 text-center font-medium" scope="col"><abbr title="Wins">W</abbr></th>
                   <th className="px-1 sm:px-2 py-2.5 text-center font-medium" scope="col"><abbr title="Saves">SV</abbr></th>
-                  <th className="px-1 sm:px-2 py-2.5 text-center font-medium" scope="col"><abbr title="Last Night Points">Last&nbsp;Night</abbr></th>
-                  <th className="px-1 sm:px-2 py-2.5 text-center font-medium" scope="col"><abbr title="Last 7 Days Points">Last&nbsp;7d</abbr></th>
+                  <th className="px-1 sm:px-2 py-2.5 text-center font-medium" scope="col"><abbr title="Last Night Points">LN</abbr></th>
+                  <th className="px-1 sm:px-2 py-2.5 text-center font-medium" scope="col"><abbr title="Last 7 Days Points">L7</abbr></th>
                   <th className="px-2 sm:px-4 py-2.5 text-right font-medium" scope="col">Pts</th>
                 </tr>
               </thead>
