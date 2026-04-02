@@ -102,8 +102,8 @@ async function getTeam(userId: string) {
       .limit(1)
       .single()
 
-    const today = config?.current_date || new Date().toISOString().split('T')[0]
-    const swapsOpen = config?.all_star_break_date ? today >= config.all_star_break_date : false
+    const configDate = config?.current_date || new Date().toISOString().split('T')[0]
+    const swapsOpen = config?.all_star_break_date ? configDate >= config.all_star_break_date : false
 
     return {
       user,
@@ -177,9 +177,9 @@ export default async function TeamView({ userId }: { userId: string }) {
                   <th className="px-1 sm:px-2 py-2.5 text-center font-medium" scope="col"><abbr title="Runs">R</abbr></th>
                   <th className="px-1 sm:px-2 py-2.5 text-center font-medium" scope="col"><abbr title="Runs Batted In">RBI</abbr></th>
                   <th className="px-1 sm:px-2 py-2.5 text-center font-medium" scope="col"><abbr title="Stolen Bases">SB</abbr></th>
-                  <th className="px-1 sm:px-2 py-2.5 text-center font-medium" scope="col"><abbr title="Last Night Points">LN</abbr></th>
+                  <th className="px-1 sm:px-2 py-2.5 text-center font-medium border-l border-navy/10" scope="col"><abbr title="Last Night Points">LN</abbr></th>
                   <th className="px-1 sm:px-2 py-2.5 text-center font-medium" scope="col"><abbr title="Last 7 Days Points">L7</abbr></th>
-                  <th className="px-2 sm:px-4 py-2.5 text-right font-medium" scope="col">Pts</th>
+                  <th className="px-2 sm:px-4 py-2.5 text-right font-medium border-l border-navy/10" scope="col">Pts</th>
                 </tr>
               </thead>
               <tbody>
@@ -204,9 +204,9 @@ export default async function TeamView({ userId }: { userId: string }) {
                     <td className="px-1 sm:px-2 py-2.5 text-center text-ink-secondary">{r.stats?.runs ?? '—'}</td>
                     <td className="px-1 sm:px-2 py-2.5 text-center text-ink-secondary">{r.stats?.rbis ?? '—'}</td>
                     <td className="px-1 sm:px-2 py-2.5 text-center text-ink-secondary">{r.stats?.stolen_bases ?? '—'}</td>
-                    <td className="px-1 sm:px-2 py-2.5 text-center text-ink-muted">{r.lastNightPts || '—'}</td>
+                    <td className="px-1 sm:px-2 py-2.5 text-center text-ink-muted border-l border-navy/10">{r.lastNightPts || '—'}</td>
                     <td className="px-1 sm:px-2 py-2.5 text-center text-ink-muted">{r.lastWeekPts || '—'}</td>
-                    <td className="px-2 sm:px-4 py-2.5 text-right font-display font-semibold text-crimson">{r.points}</td>
+                    <td className="px-2 sm:px-4 py-2.5 text-right font-display font-semibold text-crimson border-l border-navy/10">{r.points}</td>
                   </tr>
                 ))}
               </tbody>
@@ -229,9 +229,9 @@ export default async function TeamView({ userId }: { userId: string }) {
                   <th className="px-1 sm:px-2 py-2.5 text-center font-medium" scope="col"><abbr title="Strikeouts">K</abbr></th>
                   <th className="px-1 sm:px-2 py-2.5 text-center font-medium" scope="col"><abbr title="Wins">W</abbr></th>
                   <th className="px-1 sm:px-2 py-2.5 text-center font-medium" scope="col"><abbr title="Saves">SV</abbr></th>
-                  <th className="px-1 sm:px-2 py-2.5 text-center font-medium" scope="col"><abbr title="Last Night Points">LN</abbr></th>
+                  <th className="px-1 sm:px-2 py-2.5 text-center font-medium border-l border-navy/10" scope="col"><abbr title="Last Night Points">LN</abbr></th>
                   <th className="px-1 sm:px-2 py-2.5 text-center font-medium" scope="col"><abbr title="Last 7 Days Points">L7</abbr></th>
-                  <th className="px-2 sm:px-4 py-2.5 text-right font-medium" scope="col">Pts</th>
+                  <th className="px-2 sm:px-4 py-2.5 text-right font-medium border-l border-navy/10" scope="col">Pts</th>
                 </tr>
               </thead>
               <tbody>
@@ -257,9 +257,9 @@ export default async function TeamView({ userId }: { userId: string }) {
                     <td className="px-1 sm:px-2 py-2.5 text-center text-ink-secondary">{r.stats?.strikeouts ?? '—'}</td>
                     <td className="px-1 sm:px-2 py-2.5 text-center text-ink-secondary">{r.stats?.wins ?? '—'}</td>
                     <td className="px-1 sm:px-2 py-2.5 text-center text-ink-secondary">{r.stats?.saves ?? '—'}</td>
-                    <td className="px-1 sm:px-2 py-2.5 text-center text-ink-muted">{r.lastNightPts || '—'}</td>
+                    <td className="px-1 sm:px-2 py-2.5 text-center text-ink-muted border-l border-navy/10">{r.lastNightPts || '—'}</td>
                     <td className="px-1 sm:px-2 py-2.5 text-center text-ink-muted">{r.lastWeekPts || '—'}</td>
-                    <td className="px-2 sm:px-4 py-2.5 text-right font-display font-semibold text-crimson">{r.points}</td>
+                    <td className="px-2 sm:px-4 py-2.5 text-right font-display font-semibold text-crimson border-l border-navy/10">{r.points}</td>
                   </tr>
                   )
                 })}
