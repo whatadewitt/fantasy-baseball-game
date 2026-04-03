@@ -42,12 +42,10 @@ async function getTeam(userId: string) {
     })
 
     // Date boundaries for time windows
-    const today = new Date()
-    const todayStr = today.toISOString().split('T')[0]
-    const yesterdayDate = new Date(today)
-    yesterdayDate.setDate(yesterdayDate.getDate() - 1)
-    const yesterdayStr = yesterdayDate.toISOString().split('T')[0]
-    const weekAgoDate = new Date(today)
+    // Find the most recent date with stats (matches standings "last night" logic)
+    const allDates = [...new Set((allStats || []).map((s: { date: string }) => s.date))].sort()
+    const lastDate = allDates[allDates.length - 1] || null
+    const weekAgoDate = new Date()
     weekAgoDate.setDate(weekAgoDate.getDate() - 7)
     const weekAgoStr = weekAgoDate.toISOString().split('T')[0]
 
@@ -75,7 +73,7 @@ async function getTeam(userId: string) {
       const key = `${stat.mlb_id}-${stat.stat_group || 'hitting'}`
       addToBucket(statsByKey, key, stat)
       const d = stat.date as string
-      if (d === yesterdayStr || d === todayStr) addToBucket(lastNightByKey, key, stat)
+      if (d === lastDate) addToBucket(lastNightByKey, key, stat)
       if (d >= weekAgoStr) addToBucket(lastWeekByKey, key, stat)
     }
 
