@@ -17,10 +17,9 @@ async function getStandings(): Promise<StandingsEntry[]> {
   try {
     const supabase = createServiceClient()
 
-    const [{ data: users, error }, { data: rosters }, { data: scores }] = await Promise.all([
+    const [{ data: users, error }, { data: rosters }] = await Promise.all([
       supabase.from('users').select('id, team_name, created_at').order('created_at'),
       supabase.from('rosters').select('user_id, player_id, players(mlb_id, position)').eq('swapped_out', false),
-      supabase.from('scores').select('user_id, date, total_points'),
     ])
 
     if (error || !users) return []
@@ -31,16 +30,23 @@ async function getStandings(): Promise<StandingsEntry[]> {
     const mlbIds = [...new Set(typedRosters.map(r => r.players?.mlb_id).filter(Boolean))]
 
     const { data: allStats } = mlbIds.length > 0
-      ? await supabase.from('player_stats').select('mlb_id, stat_group, hits, home_runs, runs, rbis, stolen_bases, strikeouts, wins, saves, innings_pitched').in('mlb_id', mlbIds).neq('date', '2025-12-31')
+      ? await supabase.from('player_stats').select('mlb_id, date, stat_group, hits, home_runs, runs, rbis, stolen_bases, strikeouts, wins, saves, innings_pitched').in('mlb_id', mlbIds).neq('date', '2025-12-31')
       : { data: [] }
 
-    // Aggregate stats per mlb_id + stat_group
-    const statsByKey: Record<string, { hits: number, home_runs: number, runs: number, rbis: number, stolen_bases: number, strikeouts: number, wins: number, saves: number, innings_pitched: number }> = {}
+    // Find the most recent date with stats (for "last night" column)
+    const allDates = [...new Set((allStats || []).map((s: { date: string }) => s.date))].sort()
+    const lastDate = allDates[allDates.length - 1] || null
+
+    // Aggregate stats per mlb_id + stat_group, for both season total and last night
+    type StatBucket = { hits: number, home_runs: number, runs: number, rbis: number, stolen_bases: number, strikeouts: number, wins: number, saves: number, innings_pitched: number }
+    const empty = (): StatBucket => ({ hits: 0, home_runs: 0, runs: 0, rbis: 0, stolen_bases: 0, strikeouts: 0, wins: 0, saves: 0, innings_pitched: 0 })
+
+    const statsByKey: Record<string, StatBucket> = {}
+    const lastNightStatsByKey: Record<string, StatBucket> = {}
+
     for (const stat of allStats || []) {
       const key = `${stat.mlb_id}-${stat.stat_group || 'hitting'}`
-      if (!statsByKey[key]) {
-        statsByKey[key] = { hits: 0, home_runs: 0, runs: 0, rbis: 0, stolen_bases: 0, strikeouts: 0, wins: 0, saves: 0, innings_pitched: 0 }
-      }
+      if (!statsByKey[key]) statsByKey[key] = empty()
       const s = statsByKey[key]
       s.hits += stat.hits || 0
       s.home_runs += stat.home_runs || 0
@@ -51,10 +57,25 @@ async function getStandings(): Promise<StandingsEntry[]> {
       s.wins += stat.wins || 0
       s.saves += stat.saves || 0
       s.innings_pitched += stat.innings_pitched || 0
+
+      if (stat.date === lastDate) {
+        if (!lastNightStatsByKey[key]) lastNightStatsByKey[key] = empty()
+        const ln = lastNightStatsByKey[key]
+        ln.hits += stat.hits || 0
+        ln.home_runs += stat.home_runs || 0
+        ln.runs += stat.runs || 0
+        ln.rbis += stat.rbis || 0
+        ln.stolen_bases += stat.stolen_bases || 0
+        ln.strikeouts += stat.strikeouts || 0
+        ln.wins += stat.wins || 0
+        ln.saves += stat.saves || 0
+        ln.innings_pitched += stat.innings_pitched || 0
+      }
     }
 
-    // Calculate total points per user from player_stats (same as TeamView)
+    // Calculate total and last-night points per user from player_stats
     const totalByUser: Record<string, number> = {}
+    const lastNightByUser: Record<string, number> = {}
     const rosterCounts: Record<string, number> = {}
     for (const r of typedRosters) {
       rosterCounts[r.user_id] = (rosterCounts[r.user_id] || 0) + 1
@@ -62,21 +83,14 @@ async function getStandings(): Promise<StandingsEntry[]> {
 
       const hitter = isHitter(r.players.position)
       const group = hitter ? 'hitting' : 'pitching'
-      const stats = statsByKey[`${r.players.mlb_id}-${group}`]
-      if (!stats) continue
-
-      const points = hitter ? calculateHitterPoints(stats) : calculatePitcherPoints(stats)
-      totalByUser[r.user_id] = (totalByUser[r.user_id] || 0) + points
-    }
-
-    // Use scores table only for "last night" change column
-    const allDates = new Set((scores || []).map(s => s.date))
-    const lastDate = Array.from(allDates).sort().reverse()[0] || null
-    const lastNightByUser: Record<string, number> = {}
-    for (const score of scores || []) {
-      if (score.date === lastDate) {
-        lastNightByUser[score.user_id] = (lastNightByUser[score.user_id] || 0) + score.total_points
+      const key = `${r.players.mlb_id}-${group}`
+      const calcPts = (b: StatBucket | undefined) => {
+        if (!b) return 0
+        return hitter ? calculateHitterPoints(b) : calculatePitcherPoints(b)
       }
+
+      totalByUser[r.user_id] = (totalByUser[r.user_id] || 0) + calcPts(statsByKey[key])
+      lastNightByUser[r.user_id] = (lastNightByUser[r.user_id] || 0) + calcPts(lastNightStatsByKey[key])
     }
 
     return users
