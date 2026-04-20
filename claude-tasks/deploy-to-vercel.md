@@ -15,9 +15,9 @@
 ### 2. Configure Environment Variables in Vercel
 Copy these from `.env.local` into Vercel project settings (Settings → Environment Variables):
 - `SUPABASE_URL`
-- `SUPABASE_SERVICE_ROLE_KEY`
+- `SUPABASE_SECRET_KEY`
 - `NEXT_PUBLIC_SUPABASE_URL`
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
 - `RESEND_API_KEY`
 - `JWT_SECRET`
 - `ADMIN_USER_ID`
