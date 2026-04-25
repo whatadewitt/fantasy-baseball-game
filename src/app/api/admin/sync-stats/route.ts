@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase'
 import { calculateHitterPoints, calculatePitcherPoints, isHitter, inningsPitchedToOuts } from '@/lib/scoring'
 
+// Convert outs back to baseball IP notation (17 outs → 5.2)
+function outsToInningsPitched(outs: number): number {
+  return Math.floor(outs / 3) + (outs % 3) / 10
+}
+
 export async function POST(req: NextRequest) {
   const apiKey = req.headers.get('x-api-key')
   if (!process.env.ADMIN_API_KEY || apiKey !== process.env.ADMIN_API_KEY) {
@@ -57,29 +62,47 @@ export async function POST(req: NextRequest) {
         const splits = json.stats?.[0]?.splits || []
         if (splits.length === 0) return { updated: false, games: 0 }
 
-        // Store one row per game date
-        const rows = splits.map((split: { date: string; stat: Record<string, number | string> }) => {
+        // Aggregate splits by date — MLB returns one row per game, so doubleheaders
+        // produce two splits with the same date. The unique constraint on
+        // (mlb_id, date, stat_group) only allows one row, and Postgres rejects an
+        // upsert that touches the same conflict target twice in one statement.
+        type AggRow = {
+          mlb_id: number; date: string; stat_group: 'hitting' | 'pitching';
+          games_played: number; hits: number; home_runs: number; runs: number;
+          rbis: number; stolen_bases: number; strikeouts: number; wins: number;
+          saves: number; quality_starts: number; outs: number;
+          earned_runs: number; updated_at: string;
+        }
+        const now = new Date().toISOString()
+        const byDate: Record<string, AggRow> = {}
+        for (const split of splits as { date: string; stat: Record<string, number | string> }[]) {
           const s = split.stat
-          const ip = parseFloat(String(s.inningsPitched || '0'))
-          return {
-            mlb_id: entry.mlb_id,
-            date: split.date,
-            stat_group: entry.group,
-            games_played: 1,
-            hits: s.hits || 0,
-            home_runs: s.homeRuns || 0,
-            runs: s.runs || 0,
-            rbis: s.rbi || 0,
-            stolen_bases: s.stolenBases || 0,
-            strikeouts: s.strikeOuts || 0,
-            wins: s.wins || 0,
-            saves: s.saves || 0,
-            quality_starts: s.qualityStarts || 0,
-            innings_pitched: ip,
-            earned_runs: s.earnedRuns || 0,
-            updated_at: new Date().toISOString(),
+          const date = split.date
+          if (!byDate[date]) {
+            byDate[date] = {
+              mlb_id: entry.mlb_id, date, stat_group: entry.group,
+              games_played: 0, hits: 0, home_runs: 0, runs: 0, rbis: 0,
+              stolen_bases: 0, strikeouts: 0, wins: 0, saves: 0,
+              quality_starts: 0, outs: 0, earned_runs: 0, updated_at: now,
+            }
           }
-        })
+          const r = byDate[date]
+          r.games_played += 1
+          r.hits += Number(s.hits || 0)
+          r.home_runs += Number(s.homeRuns || 0)
+          r.runs += Number(s.runs || 0)
+          r.rbis += Number(s.rbi || 0)
+          r.stolen_bases += Number(s.stolenBases || 0)
+          r.strikeouts += Number(s.strikeOuts || 0)
+          r.wins += Number(s.wins || 0)
+          r.saves += Number(s.saves || 0)
+          r.quality_starts += Number(s.qualityStarts || 0)
+          r.outs += inningsPitchedToOuts(parseFloat(String(s.inningsPitched || '0')))
+          r.earned_runs += Number(s.earnedRuns || 0)
+        }
+        const rows = Object.values(byDate).map(({ outs, ...rest }) => ({
+          ...rest, innings_pitched: outsToInningsPitched(outs),
+        }))
 
         const { error } = await supabase
           .from('player_stats')
