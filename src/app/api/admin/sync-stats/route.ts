@@ -48,6 +48,58 @@ export async function POST(req: NextRequest) {
   let gamesStored = 0
   const errors: string[] = []
 
+  // --- Sync IL status from MLB roster endpoints ---
+  // We pull every team's full roster, read the `status.code`, and map D7/D10/D15/D60
+  // to a day-count. The MLB API still emits the legacy "Disabled List" D-prefix even
+  // though the public name is "Injured List". Anything else becomes NULL.
+  let ilUpdated = 0
+  try {
+    const teamsRes = await fetch(`${mlbBase}/teams?sportId=1`)
+    if (teamsRes.ok) {
+      const teamsJson = await teamsRes.json()
+      const teamIds: number[] = (teamsJson.teams || []).map((t: { id: number }) => t.id)
+
+      const ilByMlbId: Record<number, number> = {}
+      const rosterResults = await Promise.allSettled(
+        teamIds.map(async (teamId) => {
+          const res = await fetch(`${mlbBase}/teams/${teamId}/roster?rosterType=fullRoster`)
+          if (!res.ok) return
+          const json = await res.json()
+          for (const entry of json.roster || []) {
+            const code: string | undefined = entry.status?.code
+            const personId: number | undefined = entry.person?.id
+            if (!code || !personId) continue
+            const match = code.match(/^D(\d+)$/)
+            if (match) ilByMlbId[personId] = parseInt(match[1], 10)
+          }
+        })
+      )
+      for (const r of rosterResults) {
+        if (r.status === 'rejected') errors.push(`roster: ${String(r.reason)}`)
+      }
+
+      // Clear stale IL flags first, then set the current ones.
+      await supabase.from('players').update({ il_status: null }).not('il_status', 'is', null)
+
+      const ilEntries = Object.entries(ilByMlbId)
+      const byDays: Record<number, number[]> = {}
+      for (const [mlbId, days] of ilEntries) {
+        if (!byDays[days]) byDays[days] = []
+        byDays[days].push(parseInt(mlbId, 10))
+      }
+      for (const [days, ids] of Object.entries(byDays)) {
+        const { error } = await supabase
+          .from('players')
+          .update({ il_status: parseInt(days, 10) })
+          .in('mlb_id', ids)
+        if (error) errors.push(`il update: ${error.message}`)
+        else ilUpdated += ids.length
+      }
+    }
+  } catch (e) {
+    errors.push(`il sync: ${String(e)}`)
+  }
+
   // Process in batches of 20
   for (let i = 0; i < playerEntries.length; i += 20) {
     const batch = playerEntries.slice(i, i + 20)
@@ -179,6 +231,7 @@ export async function POST(req: NextRequest) {
     players_updated: updatedCount,
     games_stored: gamesStored,
     scores_calculated: scoreRows.length,
+    il_updated: ilUpdated,
     errors: errors.length ? errors.slice(0, 20) : undefined,
   })
 }

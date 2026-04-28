@@ -2,6 +2,7 @@ import { isHitter, calculateHitterPoints, calculatePitcherPoints } from '@/lib/s
 import { AVATAR_VERSION } from '@/lib/cap-colors'
 import { createServiceClient } from '@/lib/supabase'
 import Link from 'next/link'
+import IlBadge from './IlBadge'
 
 async function getTeam(userId: string) {
   try {
@@ -192,7 +193,10 @@ export default async function TeamView({ userId }: { userId: string }) {
                           className="w-8 h-8 sm:w-10 sm:h-10 rounded-full object-cover bg-navy/5 shrink-0"
                         />
                         <div className="min-w-0">
-                          <p className="font-medium text-ink truncate max-w-[120px] sm:max-w-[180px]">{r.players?.name}</p>
+                          <p className="font-medium text-ink truncate max-w-[120px] sm:max-w-[180px]">
+                            {r.players?.name}
+                            {r.players?.il_status != null && <IlBadge days={r.players.il_status} className="ml-1.5" />}
+                          </p>
                           <p className="text-[10px] sm:text-xs text-ink-muted">{r.position} · {r.players?.team}</p>
                         </div>
                       </div>
@@ -246,7 +250,10 @@ export default async function TeamView({ userId }: { userId: string }) {
                           className="w-8 h-8 sm:w-10 sm:h-10 rounded-full object-cover bg-navy/5 shrink-0"
                         />
                         <div className="min-w-0">
-                          <p className="font-medium text-ink truncate max-w-[120px] sm:max-w-[180px]">{r.players?.name}</p>
+                          <p className="font-medium text-ink truncate max-w-[120px] sm:max-w-[180px]">
+                            {r.players?.name}
+                            {r.players?.il_status != null && <IlBadge days={r.players.il_status} className="ml-1.5" />}
+                          </p>
                           <p className="text-[10px] sm:text-xs text-ink-muted">{r.position} · {r.players?.team}</p>
                         </div>
                       </div>

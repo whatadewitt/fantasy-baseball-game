@@ -8,6 +8,7 @@ export interface Player {
   position_box: number
   team: string
   image_url: string | null
+  il_status: number | null
   created_at: string
 }
 
