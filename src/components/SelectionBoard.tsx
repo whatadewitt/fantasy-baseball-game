@@ -27,6 +27,7 @@ interface Player {
   team: string
   image_url: string | null
   headshot_url: string | null
+  il_status: number | null
   stats: PlayerStats | null
   is_hitter: boolean
 }

@@ -1,6 +1,7 @@
 'use client'
 
 import { memo } from 'react'
+import IlBadge from './IlBadge'
 
 interface PlayerStats {
   games_played: number
@@ -21,6 +22,7 @@ interface Player {
   team: string
   image_url: string | null
   headshot_url: string | null
+  il_status: number | null
   stats: PlayerStats | null
   is_hitter: boolean
 }
@@ -90,6 +92,7 @@ export default memo(function PlayerCard({ player, isMyPick, isPending, canPick, 
       <div className="flex-1 min-w-0">
         <p className="font-medium text-sm truncate text-ink">
           {player.name}
+          {player.il_status != null && <IlBadge days={player.il_status} className="ml-1.5" />}
         </p>
         <p className="text-xs text-ink-muted truncate">
           {player.team}
