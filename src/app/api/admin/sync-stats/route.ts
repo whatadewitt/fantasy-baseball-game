@@ -49,8 +49,9 @@ export async function POST(req: NextRequest) {
   const errors: string[] = []
 
   // --- Sync IL status from MLB roster endpoints ---
-  // We pull every team's full roster, read the `status.code`, and map IL7/IL10/IL15/IL60
-  // to a day-count. Anything else becomes NULL (active or off-roster).
+  // We pull every team's full roster, read the `status.code`, and map D7/D10/D15/D60
+  // to a day-count. The MLB API still emits the legacy "Disabled List" D-prefix even
+  // though the public name is "Injured List". Anything else becomes NULL.
   let ilUpdated = 0
   try {
     const teamsRes = await fetch(`${mlbBase}/teams?sportId=1`)
@@ -68,7 +69,7 @@ export async function POST(req: NextRequest) {
             const code: string | undefined = entry.status?.code
             const personId: number | undefined = entry.person?.id
             if (!code || !personId) continue
-            const match = code.match(/^IL(\d+)$/)
+            const match = code.match(/^D(\d+)$/)
             if (match) ilByMlbId[personId] = parseInt(match[1], 10)
           }
         })
