@@ -1,7 +1,7 @@
 'use client'
 
 import { memo } from 'react'
-import IlBadge from './IlBadge'
+import { IlMark, IlLabel } from './IlBadge'
 
 interface PlayerStats {
   games_played: number
@@ -75,24 +75,27 @@ export default memo(function PlayerCard({ player, isMyPick, isPending, canPick, 
       aria-label={`${player.name}, ${player.team}. ${statusLabel}`}
       aria-pressed={isMyPick}
     >
-      {headshotSrc ? (
-        <img
-          src={headshotSrc}
-          alt=""
-          width={44}
-          height={44}
-          loading="lazy"
-          className="w-11 h-11 rounded-full object-cover shrink-0 bg-navy/5"
-        />
-      ) : (
-        <div className="w-11 h-11 rounded-full bg-navy/8 flex items-center justify-center text-ink-muted text-sm font-medium shrink-0">
-          {player.name.charAt(0)}
-        </div>
-      )}
+      <div className="relative shrink-0">
+        {headshotSrc ? (
+          <img
+            src={headshotSrc}
+            alt=""
+            width={44}
+            height={44}
+            loading="lazy"
+            className="w-11 h-11 rounded-full object-cover bg-navy/5"
+          />
+        ) : (
+          <div className="w-11 h-11 rounded-full bg-navy/8 flex items-center justify-center text-ink-muted text-sm font-medium">
+            {player.name.charAt(0)}
+          </div>
+        )}
+        {player.il_status != null && <IlMark days={player.il_status} />}
+      </div>
       <div className="flex-1 min-w-0">
-        <p className="font-medium text-sm truncate text-ink">
+        <p className="font-medium text-sm truncate text-ink leading-5">
           {player.name}
-          {player.il_status != null && <IlBadge days={player.il_status} className="ml-1.5" />}
+          {player.il_status != null && <IlLabel days={player.il_status} className="ml-1.5" />}
         </p>
         <p className="text-xs text-ink-muted truncate">
           {player.team}

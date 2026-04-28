@@ -2,7 +2,7 @@ import { isHitter, calculateHitterPoints, calculatePitcherPoints } from '@/lib/s
 import { AVATAR_VERSION } from '@/lib/cap-colors'
 import { createServiceClient } from '@/lib/supabase'
 import Link from 'next/link'
-import IlBadge from './IlBadge'
+import { IlMark, IlLabel } from './IlBadge'
 
 async function getTeam(userId: string) {
   try {
@@ -187,15 +187,18 @@ export default async function TeamView({ userId }: { userId: string }) {
                   <tr key={r.id} className="border-b border-navy/5 last:border-b-0">
                     <td className="px-2 sm:px-4 py-2.5">
                       <div className="flex items-center gap-2 sm:gap-3">
-                        <img
-                          src={r.players?.mlb_id ? `https://img.mlbstatic.com/mlb-photos/image/upload/w_213,d_people:generic:headshot:silo:current.png,q_auto:best,f_auto/v1/people/${r.players.mlb_id}/headshot/silo/current` : ''}
-                          alt=""
-                          className="w-8 h-8 sm:w-10 sm:h-10 rounded-full object-cover bg-navy/5 shrink-0"
-                        />
+                        <div className="relative shrink-0">
+                          <img
+                            src={r.players?.mlb_id ? `https://img.mlbstatic.com/mlb-photos/image/upload/w_213,d_people:generic:headshot:silo:current.png,q_auto:best,f_auto/v1/people/${r.players.mlb_id}/headshot/silo/current` : ''}
+                            alt=""
+                            className="w-8 h-8 sm:w-10 sm:h-10 rounded-full object-cover bg-navy/5"
+                          />
+                          {r.players?.il_status != null && <IlMark days={r.players.il_status} />}
+                        </div>
                         <div className="min-w-0">
-                          <p className="font-medium text-ink truncate max-w-[120px] sm:max-w-[180px]">
+                          <p className="font-medium text-ink truncate max-w-[120px] sm:max-w-[180px] leading-5">
                             {r.players?.name}
-                            {r.players?.il_status != null && <IlBadge days={r.players.il_status} className="ml-1.5" />}
+                            {r.players?.il_status != null && <IlLabel days={r.players.il_status} className="ml-1.5" />}
                           </p>
                           <p className="text-[10px] sm:text-xs text-ink-muted">{r.position} · {r.players?.team}</p>
                         </div>
@@ -244,15 +247,18 @@ export default async function TeamView({ userId }: { userId: string }) {
                   <tr key={r.id} className="border-b border-navy/5 last:border-b-0">
                     <td className="px-2 sm:px-4 py-2.5">
                       <div className="flex items-center gap-2 sm:gap-3">
-                        <img
-                          src={r.players?.mlb_id ? `https://img.mlbstatic.com/mlb-photos/image/upload/w_213,d_people:generic:headshot:silo:current.png,q_auto:best,f_auto/v1/people/${r.players.mlb_id}/headshot/silo/current` : ''}
-                          alt=""
-                          className="w-8 h-8 sm:w-10 sm:h-10 rounded-full object-cover bg-navy/5 shrink-0"
-                        />
+                        <div className="relative shrink-0">
+                          <img
+                            src={r.players?.mlb_id ? `https://img.mlbstatic.com/mlb-photos/image/upload/w_213,d_people:generic:headshot:silo:current.png,q_auto:best,f_auto/v1/people/${r.players.mlb_id}/headshot/silo/current` : ''}
+                            alt=""
+                            className="w-8 h-8 sm:w-10 sm:h-10 rounded-full object-cover bg-navy/5"
+                          />
+                          {r.players?.il_status != null && <IlMark days={r.players.il_status} />}
+                        </div>
                         <div className="min-w-0">
-                          <p className="font-medium text-ink truncate max-w-[120px] sm:max-w-[180px]">
+                          <p className="font-medium text-ink truncate max-w-[120px] sm:max-w-[180px] leading-5">
                             {r.players?.name}
-                            {r.players?.il_status != null && <IlBadge days={r.players.il_status} className="ml-1.5" />}
+                            {r.players?.il_status != null && <IlLabel days={r.players.il_status} className="ml-1.5" />}
                           </p>
                           <p className="text-[10px] sm:text-xs text-ink-muted">{r.position} · {r.players?.team}</p>
                         </div>
