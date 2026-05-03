@@ -29,12 +29,33 @@ async function getStandings(): Promise<StandingsEntry[]> {
     const typedRosters = (rosters || []) as unknown as RosterRow[]
     const mlbIds = [...new Set(typedRosters.map(r => r.players?.mlb_id).filter(Boolean))]
 
-    const { data: allStats } = mlbIds.length > 0
-      ? await supabase.from('player_stats').select('mlb_id, date, stat_group, hits, home_runs, runs, rbis, stolen_bases, strikeouts, wins, saves, innings_pitched').in('mlb_id', mlbIds).neq('date', '2025-12-31')
-      : { data: [] }
+    // Page through player_stats — Supabase caps a single SELECT at 1000 rows by
+    // default, and league-wide stats blow past that once the season is underway.
+    type StatRow = {
+      mlb_id: number; date: string; stat_group: string | null;
+      hits: number; home_runs: number; runs: number; rbis: number; stolen_bases: number;
+      strikeouts: number; wins: number; saves: number; innings_pitched: number;
+    }
+    const allStats: StatRow[] = []
+    if (mlbIds.length > 0) {
+      const pageSize = 1000
+      let from = 0
+      while (true) {
+        const { data } = await supabase
+          .from('player_stats')
+          .select('mlb_id, date, stat_group, hits, home_runs, runs, rbis, stolen_bases, strikeouts, wins, saves, innings_pitched')
+          .in('mlb_id', mlbIds)
+          .neq('date', '2025-12-31')
+          .range(from, from + pageSize - 1)
+        if (!data || data.length === 0) break
+        allStats.push(...(data as StatRow[]))
+        if (data.length < pageSize) break
+        from += pageSize
+      }
+    }
 
     // Find the most recent date with stats (for "last night" column)
-    const allDates = [...new Set((allStats || []).map((s: { date: string }) => s.date))].sort()
+    const allDates = [...new Set(allStats.map((s) => s.date))].sort()
     const lastDate = allDates[allDates.length - 1] || null
 
     // Aggregate stats per mlb_id + stat_group, for both season total and last night
@@ -44,7 +65,7 @@ async function getStandings(): Promise<StandingsEntry[]> {
     const statsByKey: Record<string, StatBucket> = {}
     const lastNightStatsByKey: Record<string, StatBucket> = {}
 
-    for (const stat of allStats || []) {
+    for (const stat of allStats) {
       const key = `${stat.mlb_id}-${stat.stat_group || 'hitting'}`
       if (!statsByKey[key]) statsByKey[key] = empty()
       const s = statsByKey[key]
