@@ -1,4 +1,5 @@
-import { isHitter, calculateHitterPoints, calculatePitcherPoints } from '@/lib/scoring'
+import { isHitter } from '@/lib/scoring'
+import { scoreRosters, type RosterRef } from '@/lib/team-scoring'
 import { AVATAR_VERSION } from '@/lib/cap-colors'
 import { createServiceClient } from '@/lib/supabase'
 import Link from 'next/link'
@@ -22,91 +23,39 @@ async function getTeam(userId: string) {
       .eq('user_id', userId)
       .eq('swapped_out', false)
 
-    const mlbIds = (roster || []).map((r: { players: { mlb_id: number } }) => r.players?.mlb_id).filter(Boolean)
-
-    // Page through player_stats — Supabase caps a single SELECT at 1000 rows by
-    // default. A full season of game logs across a 10-player roster will exceed
-    // that, so we loop. (StandingsTable does the same to stay consistent.)
-    const allStats: Record<string, unknown>[] = []
-    if (mlbIds.length) {
-      const pageSize = 1000
-      let from = 0
-      while (true) {
-        const { data } = await supabase
-          .from('player_stats')
-          .select('*')
-          .in('mlb_id', mlbIds)
-          .neq('date', '2025-12-31')
-          .range(from, from + pageSize - 1)
-        if (!data || data.length === 0) break
-        allStats.push(...data)
-        if (data.length < pageSize) break
-        from += pageSize
-      }
+    type RosterRow = {
+      id: string
+      user_id: string
+      player_id: string
+      position: string
+      players: { mlb_id: number; position: string; il_status: number | null; name: string; team: string } | null
     }
+    const typedRoster = (roster || []) as unknown as RosterRow[]
 
-    // Aggregate stats per mlb_id + stat_group (handles two-way players like Ohtani)
-    type StatBucket = {
-      hits: number, home_runs: number, runs: number, rbis: number, stolen_bases: number,
-      strikeouts: number, wins: number, saves: number,
-      innings_pitched: number, earned_runs: number, updated_at: string
-    }
-    const emptyBucket = (): StatBucket => ({
-      hits: 0, home_runs: 0, runs: 0, rbis: 0, stolen_bases: 0,
-      strikeouts: 0, wins: 0, saves: 0,
-      innings_pitched: 0, earned_runs: 0, updated_at: ''
-    })
+    const refs: RosterRef[] = typedRoster
+      .filter(r => r.players?.mlb_id)
+      .map(r => ({
+        user_id: r.user_id,
+        player_id: r.player_id,
+        mlb_id: r.players!.mlb_id,
+        position: r.players!.position,
+      }))
 
-    // Date boundaries for time windows
-    // Find the most recent date with stats (matches standings "last night" logic)
-    const allDates = [...new Set(allStats.map((s) => s.date as string))].sort()
-    const lastDate = allDates[allDates.length - 1] || null
-    const weekAgoDate = new Date()
-    weekAgoDate.setDate(weekAgoDate.getDate() - 7)
-    const weekAgoStr = weekAgoDate.toISOString().split('T')[0]
-
-    const statsByKey: Record<string, StatBucket> = {}
-    const lastNightByKey: Record<string, StatBucket> = {}
-    const lastWeekByKey: Record<string, StatBucket> = {}
-
-    function addToBucket(bucket: Record<string, StatBucket>, key: string, stat: Record<string, unknown>) {
-      if (!bucket[key]) bucket[key] = emptyBucket()
-      const s = bucket[key]
-      s.hits += (stat.hits as number) || 0
-      s.home_runs += (stat.home_runs as number) || 0
-      s.runs += (stat.runs as number) || 0
-      s.rbis += (stat.rbis as number) || 0
-      s.stolen_bases += (stat.stolen_bases as number) || 0
-      s.strikeouts += (stat.strikeouts as number) || 0
-      s.wins += (stat.wins as number) || 0
-      s.saves += (stat.saves as number) || 0
-      s.innings_pitched += (stat.innings_pitched as number) || 0
-      s.earned_runs += (stat.earned_runs as number) || 0
-      if ((stat.updated_at as string) > s.updated_at) s.updated_at = stat.updated_at as string
-    }
-
-    for (const stat of allStats) {
-      const key = `${stat.mlb_id}-${stat.stat_group || 'hitting'}`
-      addToBucket(statsByKey, key, stat)
-      const d = stat.date as string
-      if (d === lastDate) addToBucket(lastNightByKey, key, stat)
-      if (d >= weekAgoStr) addToBucket(lastWeekByKey, key, stat)
-    }
+    const scored = await scoreRosters(supabase, refs)
+    const scoreByPlayerId = new Map(scored.map(s => [s.player_id, s]))
 
     let totalPoints = 0
-    const rosterWithPoints = (roster || []).map((r: { players: { mlb_id: number; position: string } } & Record<string, unknown>) => {
-      const group = isHitter(r.players?.position) ? 'hitting' : 'pitching'
-      const key = `${r.players?.mlb_id}-${group}`
-      const stats = statsByKey[key] || null
-      const calcPts = (b: StatBucket | null) => {
-        if (!b) return 0
-        return isHitter(r.players?.position) ? calculateHitterPoints(b) : calculatePitcherPoints(b)
-      }
-      const points = calcPts(stats)
-      const lastNightPts = calcPts(lastNightByKey[key] || null)
-      const lastWeekPts = calcPts(lastWeekByKey[key] || null)
+    const rosterWithPoints = typedRoster.map(r => {
+      const s = scoreByPlayerId.get(r.player_id)
+      const points = s?.points ?? 0
       totalPoints += points
-      return { ...r, stats, points, lastNightPts, lastWeekPts }
+      return {
+        ...r,
+        stats: s?.stats ?? null,
+        points,
+        lastNightPts: s?.last_night_points ?? 0,
+        lastWeekPts: s?.last_week_points ?? 0,
+      }
     })
 
     const { data: config } = await supabase
@@ -124,7 +73,6 @@ async function getTeam(userId: string) {
       roster: rosterWithPoints,
       total_points: totalPoints,
       swaps_open: swapsOpen,
-      last_updated: (allStats[0]?.updated_at as string | undefined) || null,
     }
   } catch {
     return null
