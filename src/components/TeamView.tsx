@@ -24,11 +24,26 @@ async function getTeam(userId: string) {
 
     const mlbIds = (roster || []).map((r: { players: { mlb_id: number } }) => r.players?.mlb_id).filter(Boolean)
 
-    const { data: allStats } = await supabase
-      .from('player_stats')
-      .select('*')
-      .in('mlb_id', mlbIds.length ? mlbIds : [0])
-      .neq('date', '2025-12-31')
+    // Page through player_stats — Supabase caps a single SELECT at 1000 rows by
+    // default. A full season of game logs across a 10-player roster will exceed
+    // that, so we loop. (StandingsTable does the same to stay consistent.)
+    const allStats: Record<string, unknown>[] = []
+    if (mlbIds.length) {
+      const pageSize = 1000
+      let from = 0
+      while (true) {
+        const { data } = await supabase
+          .from('player_stats')
+          .select('*')
+          .in('mlb_id', mlbIds)
+          .neq('date', '2025-12-31')
+          .range(from, from + pageSize - 1)
+        if (!data || data.length === 0) break
+        allStats.push(...data)
+        if (data.length < pageSize) break
+        from += pageSize
+      }
+    }
 
     // Aggregate stats per mlb_id + stat_group (handles two-way players like Ohtani)
     type StatBucket = {
@@ -44,7 +59,7 @@ async function getTeam(userId: string) {
 
     // Date boundaries for time windows
     // Find the most recent date with stats (matches standings "last night" logic)
-    const allDates = [...new Set((allStats || []).map((s: { date: string }) => s.date))].sort()
+    const allDates = [...new Set(allStats.map((s) => s.date as string))].sort()
     const lastDate = allDates[allDates.length - 1] || null
     const weekAgoDate = new Date()
     weekAgoDate.setDate(weekAgoDate.getDate() - 7)
@@ -70,7 +85,7 @@ async function getTeam(userId: string) {
       if ((stat.updated_at as string) > s.updated_at) s.updated_at = stat.updated_at as string
     }
 
-    for (const stat of allStats || []) {
+    for (const stat of allStats) {
       const key = `${stat.mlb_id}-${stat.stat_group || 'hitting'}`
       addToBucket(statsByKey, key, stat)
       const d = stat.date as string
@@ -109,7 +124,7 @@ async function getTeam(userId: string) {
       roster: rosterWithPoints,
       total_points: totalPoints,
       swaps_open: swapsOpen,
-      last_updated: allStats?.[0]?.updated_at || null,
+      last_updated: (allStats[0]?.updated_at as string | undefined) || null,
     }
   } catch {
     return null
