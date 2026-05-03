@@ -62,6 +62,9 @@ function add(b: ScoringBucket, s: StatRow) {
 }
 
 // Pull stat rows for a set of mlb_ids, paginating past Supabase's 1000-row cap.
+// The .order('id') is load-bearing: without a stable sort, OFFSET/LIMIT can
+// return the same row on multiple pages (or skip rows), which silently
+// inflates totals once the result set crosses the page boundary.
 async function fetchStats(supabase: SupabaseClient, mlbIds: number[]): Promise<StatRow[]> {
   if (mlbIds.length === 0) return []
   const rows: StatRow[] = []
@@ -73,6 +76,7 @@ async function fetchStats(supabase: SupabaseClient, mlbIds: number[]): Promise<S
       .select('mlb_id, date, stat_group, hits, home_runs, runs, rbis, stolen_bases, strikeouts, wins, saves, innings_pitched')
       .in('mlb_id', mlbIds)
       .neq('date', '2025-12-31')
+      .order('id', { ascending: true })
       .range(from, from + pageSize - 1)
     if (!data || data.length === 0) break
     rows.push(...(data as StatRow[]))
